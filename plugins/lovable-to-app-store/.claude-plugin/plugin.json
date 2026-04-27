@@ -1,0 +1,9 @@
+{
+  "name": "lovable-to-app-store",
+  "version": "1.1.0",
+  "description": "Ship Lovable apps to iOS TestFlight and Google Play. Wraps apps in Capacitor, registers services (RevenueCat, OneSignal, Capgo), builds, and submits — with zero app store knowledge required. Includes native Google/Apple Sign-In via Supabase Edge Functions.",
+  "author": {
+    "name": "Lovable to App Store"
+  },
+  "keywords": ["lovable", "capacitor", "ios", "android", "testflight", "app-store", "mobile", "supabase", "google-signin", "apple-signin"]
+}

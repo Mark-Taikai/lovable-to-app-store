@@ -1,0 +1,30 @@
+{
+  "_instructions": "Save to ~/Documents/Claude/lovable-to-app-store/memory/orgs/{org-slug}.json — this is the org-level file for {org-slug}. It holds the Apple Team ID and org-specific accounts. Agency-level ASC credentials live in agencies/{agency-slug}.json.",
+  "_note": "Fill in FILL_IN values from your actual accounts. Do NOT store passwords here.",
+
+  "org_name": "Acme Corp",
+  "org_slug": "acme",
+  "agency": "your-agency",
+
+  "apple_team_id": "FILL_IN_FROM_APPLE_DEVELOPER_PORTAL",
+  "default_bundle_prefix": "com.yourcompany",
+
+  "play_console_email": "you@yourcompany.com",
+  "keystore_path": "~/Documents/Claude/lovable-to-app-store/keystores/{org-slug}.keystore",
+  "keystore_alias": "{org-slug}",
+
+  "revenuecat_project_name": "{org-slug}",
+  "revenuecat_account_email": "you@yourcompany.com",
+
+  "onesignal_account_email": "you@yourcompany.com",
+  "apns_p8_path": "~/Documents/Claude/lovable-to-app-store/keys/{org-slug}-apns.p8",
+
+  "github_org": "FILL_IN_GITHUB_ORG_OR_USERNAME",
+
+  "shipped_apps": [
+    "com.yourcompany.tasklist"
+  ],
+
+  "created_at": "REPLACE-WITH-ISO-DATE",
+  "notes": "{org-slug} is the first org under {Agency Name}. APPLE_TEAM_ID goes into GitHub secrets as the 5th secret alongside the 4 agency-level ASC secrets."
+}

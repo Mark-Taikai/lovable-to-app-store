@@ -1,0 +1,29 @@
+{
+  "name": "lovable-to-app-store",
+  "owner": {
+    "name": "Lovable to App Store contributors"
+  },
+  "description": "Plugins for shipping Lovable apps to the iOS App Store and Google Play.",
+  "plugins": [
+    {
+      "name": "lovable-to-app-store",
+      "source": "./plugins/lovable-to-app-store",
+      "description": "Ship Lovable apps to iOS TestFlight and Google Play. Wraps apps in Capacitor, registers services (RevenueCat, OneSignal, Capgo), builds, and submits — with zero app store knowledge required. Includes native Google/Apple Sign-In via Supabase Edge Functions.",
+      "version": "1.1.0",
+      "category": "mobile",
+      "tags": [
+        "lovable",
+        "capacitor",
+        "ios",
+        "android",
+        "testflight",
+        "app-store",
+        "mobile",
+        "supabase",
+        "google-signin",
+        "apple-signin"
+      ],
+      "license": "MIT"
+    }
+  ]
+}

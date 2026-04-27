@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  FROZEN TEMPLATE — copy verbatim to ios/App/App/App.entitlements when the app
+  uses Apple Sign-In. No substitutions.
+
+  Required additional steps (the file alone is not enough):
+    1. Add this build setting to BOTH Debug and Release in project.pbxproj:
+         CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
+    2. Enable "Sign in with Apple" capability on the App ID in the
+       Apple Developer Portal, then regenerate the provisioning profile.
+       (If you skip this, the existing profile becomes "Invalid" — see
+       references/10-build-gotchas-addendum.md.)
+    3. Wire up the code-exchange Edge Function as described in
+       references/08-apple-native-signin.md.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.developer.applesignin</key>
+    <array>
+        <string>Default</string>
+    </array>
+</dict>
+</plist>

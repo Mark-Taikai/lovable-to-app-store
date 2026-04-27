@@ -1,0 +1,27 @@
+{
+  "_instructions": "Save to ~/Documents/Claude/lovable-to-app-store/memory/agencies/{agency-slug}.json — this is the top-level agency file. It holds Apple Developer credentials shared across ALL orgs and apps that your agency ships.",
+  "_note": "The 4 ASC secrets below map directly to GitHub secrets set on every repo. CERT_PASS is stored in GitHub secrets only — never write it here. APPLE_TEAM_ID is per-org, not here.",
+
+  "agency_name": "{Agency Name}",
+  "agency_slug": "{agency-slug}",
+  "apple_developer_email": "you@yourcompany.com",
+
+  "asc_key_id": "FILL_IN_FROM_APP_STORE_CONNECT",
+  "asc_issuer_id": "FILL_IN_FROM_APP_STORE_CONNECT",
+  "asc_key_p8_path": "~/Documents/Claude/lovable-to-app-store/keys/agency-asc.p8",
+
+  "_cert_pass_note": "CERT_PASS lives in GitHub secrets only. Never store it in this file.",
+
+  "github_repo_secrets": {
+    "ASC_KEY_ID": "← from asc_key_id above",
+    "ASC_ISSUER_ID": "← from asc_issuer_id above",
+    "ASC_KEY_CONTENT": "← base64 contents of the .p8 file",
+    "CERT_PASS": "← set manually, never stored in memory files",
+    "APPLE_TEAM_ID": "← comes from the ORG file, not this file"
+  },
+
+  "orgs": ["{org-slug}"],
+
+  "created_at": "REPLACE-WITH-ISO-DATE",
+  "notes": "your agency is the Apple Developer account owner. All apps shipped under any org use these ASC credentials for CI signing."
+}

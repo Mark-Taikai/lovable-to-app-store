@@ -1,0 +1,82 @@
+<!-- INFO.PLIST ADDITIONS — add these inside the root <dict> of ios/App/App/Info.plist -->
+<!-- These apply to every app shipped with this plugin -->
+
+<!-- Bypass Apple export compliance dialog for every build.
+     Apps using only standard HTTPS/TLS qualify for this exemption.
+     Without this, every TestFlight upload shows "Missing Compliance" requiring manual dismissal. -->
+<key>ITSAppUsesNonExemptEncryption</key>
+<false/>
+
+<!-- Push notifications (required for OneSignal) -->
+<key>NSUserNotificationUsageDescription</key>
+<string>We'll send you important updates about your account.</string>
+
+<!-- Required for OneSignal background push delivery -->
+<key>UIBackgroundModes</key>
+<array>
+  <string>remote-notification</string>
+</array>
+
+<!-- App display name (what appears under the icon on home screen) -->
+<!-- Replace {{APP_DISPLAY_NAME}} with e.g. "GameChime" -->
+<key>CFBundleDisplayName</key>
+<string>{{APP_DISPLAY_NAME}}</string>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- ALWAYS ADD: location usage descriptions (preempts ITMS-90683)          -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Capacitor plugins like @bglocation/capacitor or onesignal-cordova-plugin
+     reference CoreLocation APIs in their compiled binary even when the app
+     doesn't actually use location. Apple flags missing purpose strings via
+     ITMS-90683 emails after upload. The permission dialog only appears if
+     code actually calls CLLocationManager — these strings are harmless
+     when unused. See references/10-build-gotchas-addendum.md.
+
+     ⚠️ IF THIS APP ACTUALLY USES LOCATION (uses @capacitor/geolocation,
+     reverse geocoding, geofencing, or any "find my X" / "near me" feature),
+     REPLACE these placeholder strings with a specific, user-facing reason.
+     Example: "We use your location to show restaurants near you." Apple
+     reviewers reject vague or contradictory strings under guideline 5.1.1
+     (e.g. shipping with "this app does not actively use your location"
+     while your code calls CLLocationManager will fail review). The strings
+     below are safe ONLY for apps that don't read location at runtime. -->
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>This app does not actively use your location.</string>
+<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+<string>This app does not actively use your location.</string>
+<key>NSLocationAlwaysUsageDescription</key>
+<string>This app does not actively use your location.</string>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- ONLY ADD THIS BLOCK IF THE APP USES GOOGLE SIGN-IN                     -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Google Sign-In URL scheme. Replace {{GOOGLE_IOS_URL_SCHEME}} with the  -->
+<!-- reversed iOS OAuth client ID from Google Cloud Console → Credentials    -->
+<!-- → your iOS OAuth client → "iOS URL scheme" field.                      -->
+<!-- Format: com.googleusercontent.apps.{numeric-id}-{suffix}               -->
+<!-- This is the iOS client ID reversed dot-by-dot. NOT the web client ID.  -->
+<!-- Without this, the Google sign-in drawer opens but never closes.        -->
+<!-- See references/07-google-native-signin.md for the full setup.         -->
+<!--
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLSchemes</key>
+    <array>
+      <string>{{GOOGLE_IOS_URL_SCHEME}}</string>
+    </array>
+  </dict>
+</array>
+-->
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- IF THE APP USES APPLE SIGN-IN                                          -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- No Info.plist keys are needed. Instead, you must:                      -->
+<!--   1. Create ios/App/App/App.entitlements (see templates/App.entitlements) -->
+<!--   2. Add CODE_SIGN_ENTITLEMENTS = App/App.entitlements; to project.pbxproj -->
+<!--      for both Debug and Release configurations                         -->
+<!--   3. Enable "Sign in with Apple" capability on the App ID in the      -->
+<!--      Apple Developer Portal, then regenerate the provisioning profile -->
+<!--   4. Wire up the code-exchange Edge Function                           -->
+<!-- See references/08-apple-native-signin.md for the full flow.          -->

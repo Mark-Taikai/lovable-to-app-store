@@ -1,0 +1,36 @@
+# ═══════════════════════════════════════════════════════════════════════
+# REQUIRED — never commit these to your repo (especially if it's public)
+# Append these lines to your .gitignore before the first git push
+# ═══════════════════════════════════════════════════════════════════════
+
+# Apple signing — exposing this lets anyone publish updates AS YOU
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+
+# Android signing — losing this is recoverable, leaking it is not
+*.keystore
+*.jks
+
+# Local environment / secrets
+.env
+.env.local
+.env.*.local
+
+# CocoaPods / build artifacts (large, regenerated)
+ios/App/Pods/
+ios/App/build/
+android/app/build/
+android/.gradle/
+android/build/
+
+# Keys directory commonly used during development
+keys/
+secrets/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

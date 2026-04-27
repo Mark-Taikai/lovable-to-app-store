@@ -1,0 +1,304 @@
+# FROZEN TEMPLATE — DO NOT REGENERATE FROM SCRATCH
+# Battle-tested workflow. Every app shipped with this plugin uses this unchanged.
+#
+# ══════════════════════════════════════════════════════
+#  ONLY CHANGE: replace {{BUNDLE_ID}} (appears 3 times)
+#  Example:  {{BUNDLE_ID}} → com.yourcompany.gamechime
+# ══════════════════════════════════════════════════════
+#
+# GITHUB SECRETS — same values for every app shipped under your agency/org (only APPLE_TEAM_ID changes per org):
+#   ASC_KEY_ID      = (from App Store Connect → Integrations → API)
+#   ASC_ISSUER_ID   = (UUID from same page)
+#   ASC_KEY_CONTENT = (full .p8 file contents incl BEGIN/END lines)
+#   CERT_PASS       = (a strong, randomly-generated password used to encrypt the exported signing certificate. Use the same value across all apps under one Apple Team for convenience, but never reuse a password from another account or service.)
+#   APPLE_TEAM_ID   = (10-char team ID — same for all apps under one Apple Developer team)
+
+name: iOS Build & TestFlight
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    # macos-15 + latest-stable required for iOS 26 SDK.
+    # Apple requires iOS 26 SDK for all submissions after April 28, 2026.
+    # DO NOT use macos-latest alone — may resolve to macos-14 (Xcode 15).
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode (latest-stable — includes iOS 26 SDK)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Sync Capacitor
+        run: npx cap sync ios
+
+      # Caches the Pods directory. Prevents 429 "CDN: trunk" rate limit errors
+      # when CI jobs run back-to-back. Key busts automatically when Podfile.lock changes.
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: ios/App/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/App/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Install CocoaPods
+        run: cd ios/App && pod install --repo-update
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: pip install requests cryptography pillow PyJWT --break-system-packages
+
+      # ── FAST-FAIL: validate Apple credentials before spending 20min building ──
+      # Catches the #1 cause of wasted CI time: wrong ASC_KEY_ID / ASC_ISSUER_ID.
+      # Fix: Go to appstoreconnect.apple.com → Users and Access → Integrations → API
+      - name: Validate ASC credentials
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+        run: |
+          python3 - << 'HEREDOC'
+          import os, sys, time
+          import jwt, requests
+
+          key_id      = os.environ['ASC_KEY_ID'].strip()
+          issuer_id   = os.environ['ASC_ISSUER_ID'].strip()
+          key_content = os.environ['ASC_KEY_CONTENT'].strip()
+
+          print(f'Key ID:     {key_id}')
+          print(f'Issuer ID:  {issuer_id}')
+          print(f'Key length: {len(key_content)} chars')
+
+          payload = {'iss': issuer_id, 'exp': int(time.time()) + 600, 'aud': 'appstoreconnect-v1'}
+          token = jwt.encode(payload, key_content, algorithm='ES256',
+                             headers={'kid': key_id, 'typ': 'JWT'})
+          r = requests.get('https://api.appstoreconnect.apple.com/v1/apps?limit=1',
+                           headers={'Authorization': f'Bearer {token}'})
+          print(f'ASC HTTP status: {r.status_code}')
+          if r.status_code != 200:
+              print(f'RESPONSE: {r.text[:500]}')
+              print()
+              print('❌ ASC CREDENTIALS INVALID — build aborted.')
+              print('Fix: Check ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_CONTENT in repo Settings → Secrets.')
+              sys.exit(1)
+          print('✅ ASC credentials valid')
+          HEREDOC
+
+      # ── Generate iOS icon set and splash ─────────────────────────────────────
+      # Requires: assets/icon-1024.png (no transparency, no rounded corners)
+      # Requires: assets/splash-2732.png (prevents black screen on launch)
+      # CRITICAL: ios-marketing MUST be scale "1x" / size "1024x1024"
+      #           Xcode default generates "2x"/"512x512" — Apple REJECTS that.
+      - name: Generate iOS icon set and splash imageset
+        run: |
+          python3 - << 'HEREDOC'
+          import json, os, sys
+          from PIL import Image
+
+          ICON_SRC   = 'assets/icon-1024.png'
+          SPLASH_SRC = 'assets/splash-2732.png'
+          ICON_DIR   = 'ios/App/App/Assets.xcassets/AppIcon.appiconset'
+          SPLASH_DIR = 'ios/App/App/Assets.xcassets/Splash.imageset'
+
+          ICON_SIZES = [
+              ('iphone',  '20x20',     2), ('iphone',  '20x20',     3),
+              ('iphone',  '29x29',     2), ('iphone',  '29x29',     3),
+              ('iphone',  '40x40',     2), ('iphone',  '40x40',     3),
+              ('iphone',  '60x60',     2), ('iphone',  '60x60',     3),
+              ('ipad',    '20x20',     1), ('ipad',    '20x20',     2),
+              ('ipad',    '29x29',     1), ('ipad',    '29x29',     2),
+              ('ipad',    '40x40',     1), ('ipad',    '40x40',     2),
+              ('ipad',    '76x76',     1), ('ipad',    '76x76',     2),
+              ('ipad',    '83.5x83.5', 2),
+          ]
+
+          os.makedirs(ICON_DIR, exist_ok=True)
+          if not os.path.exists(ICON_SRC):
+              print(f'ERROR: {ICON_SRC} not found. Commit assets/icon-1024.png to the repo root.')
+              sys.exit(1)
+
+          src = Image.open(ICON_SRC).convert('RGBA')
+          images_entries = []
+          for idiom, size_str, scale in ICON_SIZES:
+              base = float(size_str.split('x')[0])
+              px   = int(base * scale)
+              fname = f'Icon-{size_str}@{scale}x.png'
+              resized = src.resize((px, px), Image.LANCZOS)
+              bg = Image.new('RGB', (px, px), (255, 255, 255))
+              bg.paste(resized, mask=resized.split()[3])
+              bg.save(os.path.join(ICON_DIR, fname))
+              images_entries.append({'filename': fname, 'idiom': idiom,
+                                     'scale': f'{scale}x', 'size': size_str})
+
+          # ios-marketing MUST be "scale": "1x", "size": "1024x1024"
+          marketing_file = 'Icon-1024x1024@1x.png'
+          src.convert('RGB').save(os.path.join(ICON_DIR, marketing_file))
+          images_entries.append({'filename': marketing_file, 'idiom': 'ios-marketing',
+                                 'scale': '1x', 'size': '1024x1024'})
+
+          contents = {'images': images_entries, 'info': {'author': 'xcode', 'version': 1}}
+          with open(os.path.join(ICON_DIR, 'Contents.json'), 'w') as f:
+              json.dump(contents, f, indent=2)
+          print(f'✅ iOS icon set: {len(images_entries)} entries')
+
+          if os.path.exists(SPLASH_SRC):
+              os.makedirs(SPLASH_DIR, exist_ok=True)
+              splash = Image.open(SPLASH_SRC).convert('RGB')
+              for scale in [1, 2, 3]:
+                  splash.save(os.path.join(SPLASH_DIR, f'splash@{scale}x.png'))
+              contents = {'images': [
+                  {'filename': f'splash@{s}x.png', 'idiom': 'universal', 'scale': f'{s}x'}
+                  for s in [1, 2, 3]
+              ], 'info': {'author': 'xcode', 'version': 1}}
+              with open(os.path.join(SPLASH_DIR, 'Contents.json'), 'w') as f:
+                  json.dump(contents, f, indent=2)
+              print(f'✅ Splash imageset written')
+          else:
+              print(f'WARNING: {SPLASH_SRC} not found — expect black screen on launch!')
+          HEREDOC
+
+      - name: Create cert and provisioning profile
+        id: cert
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+          CERT_PASS: ${{ secrets.CERT_PASS }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          BUNDLE_ID: {{BUNDLE_ID}}
+        run: python3 .github/scripts/setup_cert.py
+
+      # ── Patch ALL signing settings globally in pbxproj ───────────────────────
+      # Global replacement is REQUIRED — SPM dependency targets (RevenueCat etc.)
+      # also need Manual signing or the build fails with "No profiles for bundle ID".
+      - name: Force signing settings globally in pbxproj
+        env:
+          PROFILE_UUID: ${{ env.PROFILE_UUID }}
+          BUNDLE_ID: {{BUNDLE_ID}}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          python3 - << 'HEREDOC'
+          import re, os, subprocess
+          uuid      = os.environ.get('PROFILE_UUID', '')
+          bundle_id = os.environ.get('BUNDLE_ID', '')
+          team_id   = os.environ.get('APPLE_TEAM_ID', '')
+          pbx       = 'ios/App/App.xcodeproj/project.pbxproj'
+          with open(pbx) as f:
+              c = f.read()
+          c = re.sub('CODE_SIGN_IDENTITY = "[^"]*";',
+                     'CODE_SIGN_IDENTITY = "iPhone Distribution";', c)
+          c = re.sub('CODE_SIGN_STYLE = [A-Za-z]+;',
+                     'CODE_SIGN_STYLE = Manual;', c)
+          if uuid:
+              c = re.sub(r'\n[ \t]+PROVISIONING_PROFILE[^\n]*', '', c)
+              c = c.replace(
+                  f'PRODUCT_BUNDLE_IDENTIFIER = {bundle_id};',
+                  f'PRODUCT_BUNDLE_IDENTIFIER = {bundle_id};\n\t\t\t\tPROVISIONING_PROFILE = "{uuid}";'
+              )
+          if team_id:
+              c = re.sub(r'DEVELOPMENT_TEAM = [^;]*;', f'DEVELOPMENT_TEAM = {team_id};', c)
+          with open(pbx, 'w') as f:
+              f.write(c)
+          r = subprocess.run(['grep', '-nE', 'CODE_SIGN|PROVISIONING|DEVELOPMENT_TEAM', pbx],
+                             capture_output=True, text=True)
+          print(r.stdout)
+          print('✅ Signing settings applied globally.')
+          HEREDOC
+
+      - name: Import certificate to keychain
+        env:
+          CERT_PASS: ${{ secrets.CERT_PASS }}
+        run: |
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import /tmp/dist.p12 \
+            -k build.keychain \
+            -P "$CERT_PASS" \
+            -A -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s -k "" build.keychain
+
+      - name: Install provisioning profile
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp /tmp/dist.mobileprovision \
+            ~/Library/MobileDevice/Provisioning\ Profiles/${PROFILE_UUID}.mobileprovision
+
+      - name: Archive
+        run: |
+          xcodebuild archive \
+            -destination 'generic/platform=iOS' \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -archivePath /tmp/App.xcarchive \
+            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Export IPA
+        env:
+          PROFILE_UUID: ${{ env.PROFILE_UUID }}
+          BUNDLE_ID: {{BUNDLE_ID}}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cat > /tmp/ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${PROFILE_UUID}</string>
+            </dict>
+            <key>uploadBitcode</key><false/>
+            <key>compileBitcode</key><false/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath /tmp/App.xcarchive \
+            -exportPath /tmp/App-ipa \
+            -exportOptionsPlist /tmp/ExportOptions.plist
+
+      - name: Upload to TestFlight
+        run: |
+          xcrun altool --upload-app \
+            -f "$(ls /tmp/App-ipa/*.ipa | head -1)" \
+            -t ios \
+            --apiKey ${{ secrets.ASC_KEY_ID }} \
+            --apiIssuer ${{ secrets.ASC_ISSUER_ID }}
+
+      - name: Upload cert info artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-cert-info
+          path: /tmp/dist-cert-info.zip
+          if-no-files-found: ignore

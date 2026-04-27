@@ -1,0 +1,26 @@
+# Built plugin artifacts (regenerated from source)
+*.plugin
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Local working copies
+/tmp/
+*.log
+
+# Anything that looks like a secret — defensive defaults
+*.p8
+*.p12
+*.keystore
+*.jks
+.env
+.env.*
+
+# Build artifacts inside the marketplace (in case anyone tests builds in-repo)
+node_modules/
+dist/
+build/
