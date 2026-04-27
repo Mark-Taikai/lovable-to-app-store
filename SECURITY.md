@@ -6,7 +6,7 @@ If you discover a security issue with this plugin — for example, a workflow th
 
 Instead:
 
-1. Open a [private security advisory](https://github.com/YOUR-GITHUB-USERNAME/lovable-to-app-store/security/advisories/new) on this repository, **or**
+1. Open a [private security advisory](https://github.com/Mark-Taikai/lovable-to-app-store/security/advisories/new) on this repository, **or**
 2. Open a regular GitHub issue with the title `[Security] Please contact me privately` and no further details — a maintainer will reach out.
 
 We aim to acknowledge security reports within 48 hours and ship a fix within 14 days for critical issues.

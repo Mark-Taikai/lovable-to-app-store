@@ -38,7 +38,7 @@ Sign up at [play.google.com/console/signup](https://play.google.com/console/sign
 
 In Claude Code:
 ```
-/plugin marketplace add YOUR-GITHUB-USERNAME/lovable-to-app-store
+/plugin marketplace add Mark-Taikai/lovable-to-app-store
 /plugin install lovable-to-app-store@lovable-to-app-store
 ```
 

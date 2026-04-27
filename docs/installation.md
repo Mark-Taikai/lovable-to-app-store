@@ -6,7 +6,7 @@ This plugin works in two environments. Pick the one you use.
 
 1. Add this repo as a plugin marketplace:
    ```
-   /plugin marketplace add YOUR-GITHUB-USERNAME/lovable-to-app-store
+   /plugin marketplace add Mark-Taikai/lovable-to-app-store
    ```
 2. Install the plugin from the marketplace:
    ```
@@ -26,11 +26,11 @@ To update later when a new version ships:
 ## Cowork (desktop chat)
 
 1. Open the Cowork settings → Plugins.
-2. Add this marketplace by URL — paste `https://github.com/YOUR-GITHUB-USERNAME/lovable-to-app-store`.
+2. Add this marketplace by URL — paste `https://github.com/Mark-Taikai/lovable-to-app-store`.
 3. Find `lovable-to-app-store` in the marketplace list and click Install.
 
 Or, for a one-off install without the marketplace:
-1. Download the latest `.plugin` zip from the [Releases page](https://github.com/YOUR-GITHUB-USERNAME/lovable-to-app-store/releases).
+1. Download the latest `.plugin` zip from the [Releases page](https://github.com/Mark-Taikai/lovable-to-app-store/releases).
 2. Drag it into the Cowork plugin install UI.
 
 > **Note:** the marketplace `marketplace.json` schema is still evolving in Claude / Cowork. If install fails, check the official [Claude Code plugin docs](https://docs.claude.com/en/docs/claude-code/plugins) for the current syntax.

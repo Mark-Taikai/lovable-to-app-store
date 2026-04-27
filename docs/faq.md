@@ -109,8 +109,8 @@ None of them officially. This is a community plugin. Capgo is a third-party OTA 
 ### How do I get help?
 
 1. Read the [Troubleshooting](./troubleshooting.md) guide.
-2. Search [closed issues](https://github.com/YOUR-GITHUB-USERNAME/lovable-to-app-store/issues?q=is%3Aissue+is%3Aclosed) — your problem is probably there.
-3. [Open a new issue](https://github.com/YOUR-GITHUB-USERNAME/lovable-to-app-store/issues/new) with the bug report template, including the exact error message and what you said to Claude.
+2. Search [closed issues](https://github.com/Mark-Taikai/lovable-to-app-store/issues?q=is%3Aissue+is%3Aclosed) — your problem is probably there.
+3. [Open a new issue](https://github.com/Mark-Taikai/lovable-to-app-store/issues/new) with the bug report template, including the exact error message and what you said to Claude.
 
 ### How do I report a security issue?
 

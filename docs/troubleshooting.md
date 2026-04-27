@@ -1,6 +1,6 @@
 # Troubleshooting
 
-The most common things that go wrong, and how to fix them. If your problem isn't here, [open an issue](https://github.com/YOUR-GITHUB-USERNAME/lovable-to-app-store/issues/new?template=bug_report.md) — we'll add it.
+The most common things that go wrong, and how to fix them. If your problem isn't here, [open an issue](https://github.com/Mark-Taikai/lovable-to-app-store/issues/new?template=bug_report.md) — we'll add it.
 
 ## Build & submission
 

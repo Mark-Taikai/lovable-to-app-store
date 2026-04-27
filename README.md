@@ -52,11 +52,11 @@ flowchart LR
 **Step 1 — Install the plugin** in Claude Code or Cowork:
 
 ```bash
-/plugin marketplace add YOUR-GITHUB-USERNAME/lovable-to-app-store
+/plugin marketplace add Mark-Taikai/lovable-to-app-store
 /plugin install lovable-to-app-store@lovable-to-app-store
 ```
 
-(Replace `YOUR-GITHUB-USERNAME` with whoever published this repo. In Cowork, drag the `.plugin` zip into the plugin install UI instead.)
+(Replace `Mark-Taikai` with whoever published this repo. In Cowork, drag the `.plugin` zip into the plugin install UI instead.)
 
 **Step 2 — Have these accounts ready** (the plugin will walk you through each):
 
@@ -162,9 +162,9 @@ When you say *"ship this app and it uses Google Sign-In"*, the plugin creates th
 
 ## 💬 Community
 
-- 🐛 **Found a bug?** [Open an issue](https://github.com/YOUR-GITHUB-USERNAME/lovable-to-app-store/issues/new?template=bug_report.md)
-- 💡 **Have a feature request?** [Suggest one](https://github.com/YOUR-GITHUB-USERNAME/lovable-to-app-store/issues/new?template=feature_request.md)
-- ❓ **Have a question?** [Ask here](https://github.com/YOUR-GITHUB-USERNAME/lovable-to-app-store/issues/new?template=question.md)
+- 🐛 **Found a bug?** [Open an issue](https://github.com/Mark-Taikai/lovable-to-app-store/issues/new?template=bug_report.md)
+- 💡 **Have a feature request?** [Suggest one](https://github.com/Mark-Taikai/lovable-to-app-store/issues/new?template=feature_request.md)
+- ❓ **Have a question?** [Ask here](https://github.com/Mark-Taikai/lovable-to-app-store/issues/new?template=question.md)
 - 🔒 **Security disclosure?** See [SECURITY.md](./SECURITY.md)
 - 🤝 **Want to contribute?** See [CONTRIBUTING.md](./CONTRIBUTING.md)
 
@@ -172,7 +172,7 @@ When you say *"ship this app and it uses Google Sign-In"*, the plugin creates th
 
 ## 📜 License
 
-MIT — see [LICENSE](./LICENSE). Use it, fork it, adapt it. If you ship something cool, [tell us about it](https://github.com/YOUR-GITHUB-USERNAME/lovable-to-app-store/discussions).
+MIT — see [LICENSE](./LICENSE). Use it, fork it, adapt it. If you ship something cool, [tell us about it](https://github.com/Mark-Taikai/lovable-to-app-store/discussions).
 
 ---
 
