@@ -1,8 +1,27 @@
 # Installation
 
-This plugin works in two environments. Pick the one you use.
+This plugin works in two Claude products. Pick the one you use.
 
-## Claude Code (terminal-based)
+---
+
+## 📱 Cowork (desktop chat app — recommended for non-technical Lovable users)
+
+The fastest path:
+
+1. Download the plugin file from the latest release: **[lovable-to-app-store.plugin](https://github.com/Mark-Taikai/lovable-to-app-store/releases/latest/download/lovable-to-app-store.plugin)**
+2. Open Cowork → **Settings → Plugins → Add plugin** (the exact menu name may vary between Cowork versions — look for something like "Add plugin", "Install plugin", or a `+` button next to "Personal plugins")
+3. Drag the downloaded `.plugin` file onto the install dialog, or click "Choose file" and select it.
+4. After install, the three skills (`ship`, `update`, `add-native`) become available in any Cowork conversation.
+
+> **Why not the slash commands?** Cowork doesn't currently expose adding arbitrary GitHub marketplaces from chat — that flow only exists in the Claude Code terminal CLI. The `.plugin` file is a portable zip of the marketplace contents and works the same way in Cowork.
+
+To update to a new version: download the latest `.plugin` file and re-install. Cowork will replace the old version.
+
+---
+
+## 💻 Claude Code (terminal CLI)
+
+In your terminal, with Claude Code running:
 
 1. Add this repo as a plugin marketplace:
    ```
@@ -23,21 +42,13 @@ To update later when a new version ships:
 /plugin update lovable-to-app-store@lovable-to-app-store
 ```
 
-## Cowork (desktop chat)
+> **Note:** the marketplace `marketplace.json` schema is still evolving in Claude Code. If install fails, check the official [Claude Code plugin docs](https://docs.claude.com/en/docs/claude-code/plugins) for the current syntax, or download the `.plugin` file from the [latest release](https://github.com/Mark-Taikai/lovable-to-app-store/releases/latest) as a fallback.
 
-1. Open the Cowork settings → Plugins.
-2. Add this marketplace by URL — paste `https://github.com/Mark-Taikai/lovable-to-app-store`.
-3. Find `lovable-to-app-store` in the marketplace list and click Install.
-
-Or, for a one-off install without the marketplace:
-1. Download the latest `.plugin` zip from the [Releases page](https://github.com/Mark-Taikai/lovable-to-app-store/releases).
-2. Drag it into the Cowork plugin install UI.
-
-> **Note:** the marketplace `marketplace.json` schema is still evolving in Claude / Cowork. If install fails, check the official [Claude Code plugin docs](https://docs.claude.com/en/docs/claude-code/plugins) for the current syntax.
+---
 
 ## What gets installed
 
-The plugin adds three skills to your environment:
+The plugin adds three skills to your Claude environment:
 
 - `lovable-to-app-store:ship` — first-time app submission
 - `lovable-to-app-store:update` — OTA updates after Lovable changes

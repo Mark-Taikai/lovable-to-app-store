@@ -36,13 +36,15 @@ Sign up at [play.google.com/console/signup](https://play.google.com/console/sign
 
 ### Step 1 — Install the plugin
 
-In Claude Code:
+**If you use Cowork (the desktop chat app):** download [`lovable-to-app-store.plugin`](https://github.com/Mark-Taikai/lovable-to-app-store/releases/latest/download/lovable-to-app-store.plugin) → open Cowork → Settings → Plugins → Add plugin → drop the file in. (Cowork doesn't currently support adding GitHub marketplaces from chat — the drag-drop is the supported path.)
+
+**If you use Claude Code (terminal CLI):**
 ```
 /plugin marketplace add Mark-Taikai/lovable-to-app-store
 /plugin install lovable-to-app-store@lovable-to-app-store
 ```
 
-In Cowork: open the plugin manager (Settings → Plugins → Add) and either paste the marketplace URL or drag the bundled `.plugin` zip in.
+After install, the three skills (`ship`, `update`, `add-native`) become available in any conversation.
 
 ### Step 2 — Talk to Claude
 

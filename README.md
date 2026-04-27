@@ -49,14 +49,36 @@ flowchart LR
 
 ## 🚀 Quick Start (60 seconds)
 
-**Step 1 — Install the plugin** in Claude Code or Cowork:
+**Step 1 — Install the plugin.** Pick the path for whichever Claude product you use:
 
-```bash
+<details open>
+<summary><b>📱 If you use Cowork (the desktop chat app — most Lovable users)</b></summary>
+
+1. Download the latest plugin file: **[lovable-to-app-store.plugin](https://github.com/Mark-Taikai/lovable-to-app-store/releases/latest/download/lovable-to-app-store.plugin)** (one file, ~80 KB)
+2. Open Cowork → Settings → Plugins → click **"Add plugin"** (or the equivalent in your Cowork version)
+3. Drag the `.plugin` file onto the install dialog — done.
+
+> Cowork doesn't support adding GitHub marketplaces directly from chat, so the drag-drop is the supported path. Future Cowork versions may change this.
+
+</details>
+
+<details>
+<summary><b>💻 If you use Claude Code (the terminal CLI)</b></summary>
+
+In your terminal, with Claude Code running, paste:
+
+```
 /plugin marketplace add Mark-Taikai/lovable-to-app-store
 /plugin install lovable-to-app-store@lovable-to-app-store
 ```
 
-(Replace `Mark-Taikai` with whoever published this repo. In Cowork, drag the `.plugin` zip into the plugin install UI instead.)
+To update later when a new version ships:
+
+```
+/plugin update lovable-to-app-store@lovable-to-app-store
+```
+
+</details>
 
 **Step 2 — Have these accounts ready** (the plugin will walk you through each):
 
