@@ -103,7 +103,7 @@ The `references/templates/` directory contains the exact files from the successf
 ## Key Principles
 
 - **Pre-flight first.** Always run `references/00-preflight.md` before any other work.
-- **{org-slug} fast path.** If client is {org-slug} with existing secrets → skip service registration.
+- **Returning client fast path.** If a returning client (existing org in memory) already has all 5 GitHub secrets → skip service registration entirely.
 - **Never regenerate what's frozen.** Use the templates. Never retype code from reference docs.
 - **Validate credentials immediately.** A 401 from Apple takes 5 seconds to catch. A failed CI build takes 20 minutes.
 - **Never ask mid-workflow.** All questions happen upfront.

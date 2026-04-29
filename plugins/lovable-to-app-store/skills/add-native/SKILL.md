@@ -64,7 +64,7 @@ Parse the user's request. If ambiguous (e.g., "add login with Apple"), clarify w
 ls ~/Documents/Claude/lovable-to-app-store/memory/apps/
 ```
 
-Load the app's memory file. Get: `github_repo`, `bundle_id`, `apple_team_id`, `capgo.api_key`, build method.
+Load the app's memory file. Get: `github_repo`, `bundle_id`, `apple_team_id`, `apple.app_store_connect_app_id`, and the build method.
 
 ### Step 3: Pull latest code
 
@@ -122,17 +122,22 @@ Find a natural place in the app to demonstrate the feature. Typically:
 Example for haptics:
 ```typescript
 // src/lib/native/haptics.ts
-import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { Capacitor } from '@capacitor/core';
 
 export const hapticFeedback = async (style: 'light' | 'medium' | 'heavy' = 'medium') => {
   if (!Capacitor.isNativePlatform()) return;
-  await Haptics.impact({ style: ImpactStyle[style.charAt(0).toUpperCase() + style.slice(1) as keyof typeof ImpactStyle] });
+  const styleMap = {
+    light: ImpactStyle.Light,
+    medium: ImpactStyle.Medium,
+    heavy: ImpactStyle.Heavy,
+  };
+  await Haptics.impact({ style: styleMap[style] });
 };
 
 export const hapticSuccess = async () => {
   if (!Capacitor.isNativePlatform()) return;
-  await Haptics.notification({ type: 'SUCCESS' } as any);
+  await Haptics.notification({ type: NotificationType.Success });
 };
 ```
 

@@ -2,7 +2,7 @@
 
 Ask all questions at once using AskUserQuestion before doing any browser work. Pre-fill answers that can be inferred from the repo or loaded from memory. If a client already exists in memory with all required data, skip the questions entirely and confirm with one message: "I found [Client Name] in memory — using their Apple Team ID and existing settings. Starting now."
 
-## The Eight Questions
+## The Nine Questions
 
 ### 1. App display name
 - Pre-fill guess from repo `name` in package.json, title tag in index.html, or repo name
@@ -12,7 +12,7 @@ Ask all questions at once using AskUserQuestion before doing any browser work. P
 ### 2. Client name (for memory organization)
 - Use to create the memory folder and namespace bundle IDs
 - Question: "Which client or project is this for? (Used to organize your app settings)"
-- Example: "Acme Corp" or "{org-slug} internal"
+- Example: "Acme Corp" or "Acme Internal"
 - If memory already has this client, auto-fill and skip
 
 ### 3. Bundle ID

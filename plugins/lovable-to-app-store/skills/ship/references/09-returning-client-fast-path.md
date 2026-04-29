@@ -46,11 +46,11 @@ You still need to create fresh listings for each new app. Open tabs for each in 
 - Note the numeric App Store Connect ID (from the URL)
 
 **RevenueCat** (`app.revenuecat.com`)
-- Navigate to the existing {org-slug} project (do NOT create a new project)
+- Navigate to the existing org's RevenueCat project (do NOT create a new project — the returning client already has one)
 - Apps → "+" → Add iOS app
   - App Name: `{AppDisplayName}`
   - Bundle ID: `{bundleId}`
-  - Apple Team ID: from memory (`{org-slug}.json`)
+  - Apple Team ID: from `memory/orgs/{org-slug}.json` → `apple_team_id`
   - App Store Connect App ID: the numeric ID captured above
 - After saving, go to **Project Settings → API Keys**
 - Find the **Public SDK Key** for this new iOS app — it starts with `appl_`

@@ -137,7 +137,7 @@ Skip the upfront sign-in question in `01-questions.md` and confirm in the summar
 ## Pre-flight Complete
 
 Announce:
-> "✅ Pre-flight complete. Agency: your agency. Org: {org-name}. Credentials valid, templates ready, assets confirmed."
+> "✅ Pre-flight complete. Agency: {agency_name from memory}. Org: {org-name}. Credentials valid, templates ready, assets confirmed."
 
 Then:
 - If client is an existing org with all 5 secrets → proceed to `references/09-returning-client-fast-path.md`

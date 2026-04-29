@@ -4,6 +4,19 @@ All notable changes to the `lovable-to-app-store` plugin are documented here. Fo
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-04-27
+
+### Fixed
+- **`update` skill rewritten.** The previous version assumed Capgo was set up during `ship`, but the default ship flow uses `server.url` pointing to Lovable for automatic OTA — Capgo was never configured, so any Capgo CLI command would fail. The skill now correctly explains the three update paths: (1) web-only changes flow automatically via the Lovable URL, (2) edge function changes need a manual deploy request to Lovable + curl verification, (3) native code changes redirect to `add-native` or a re-run of `ship`. Capgo is documented as an optional advanced path with its own setup, not the default.
+- **`add-native` skill** no longer requires `capgo.api_key` from memory (it produces a new build, not an OTA — Capgo isn't relevant).
+- **Haptics example** in `add-native` rewritten to use a clean lookup map instead of bracket-indexing into the `ImpactStyle` enum, which produced fragile and hard-to-read code.
+- **Substitution artifacts:** removed leftover `{org-slug}` placeholders from `ship/SKILL.md`, `01-questions.md`, `00-preflight.md`, and `09-returning-client-fast-path.md`.
+- **`01-questions.md`** header corrected: said "The Eight Questions" but lists nine (the upfront sign-in question added in v1.1.0 brought the count to 9).
+- **Pre-flight summary** now substitutes the actual agency name from memory instead of literally announcing "Agency: your agency".
+
+### Changed
+- Plugin description and metadata reflect the three real OTA paths (`server.url`, edge function deploy, optional Capgo).
+
 ## [1.1.0] — 2026-04-27
 
 ### Added
