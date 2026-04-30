@@ -2,12 +2,13 @@
 name: update
 description: >
   Push updates to a published app after making changes in Lovable. With the
-  default ship setup, OTA updates happen AUTOMATICALLY when Lovable redeploys —
-  this skill verifies the deploy went through, handles edge function deployment
-  (which Lovable doesn't auto-deploy), and bumps native builds when web-only
-  updates aren't enough. Triggered by: "update [app name]", "push update for
-  [app]", "deploy latest Lovable changes", "push OTA", "sync latest changes to
-  the app", "publish new version", "the app needs an update".
+  v2.0+ ship setup (bundled dist + Capacitor Updater + Supabase Storage OTA),
+  this skill builds a new web bundle, uploads it to your OTA bucket, and
+  flips the active row in the ota_releases table — installed apps pick it up
+  on their next launch (or next resume from background). Triggered by:
+  "update [app name]", "push update for [app]", "deploy latest Lovable
+  changes", "push OTA", "sync latest changes to the app", "publish new
+  version", "the app needs an update".
 tools:
   - Bash
   - Read
@@ -17,21 +18,30 @@ tools:
 
 # Push an Update
 
-After the user changes something in Lovable, this skill makes sure those changes reach installed apps.
+After the user changes something in Lovable, this skill makes sure those
+changes reach installed apps.
 
-## How updates actually work in this plugin
+## How updates work in v2.0+ (bundled + Capacitor Updater)
 
-The `ship` skill points the native app at the live Lovable URL via `server.url` in `capacitor.config.ts`. This means:
+The `ship` skill bundles `dist/` into the .ipa and uses
+`@capgo/capacitor-updater` to download new bundles from the user's own
+Supabase Storage bucket. Updates have three buckets:
 
-- **OTA is automatic.** When the user redeploys in Lovable, the WebView loads the new version on next app launch. No CLI commands required.
-- **There is no "push update" step for web-only changes.** The update is already live the moment Lovable's deploy finishes.
-- **Native code changes still require a new App Store / Play Store build.** Adding a Capacitor plugin, changing the bundle ID, swapping the app icon, etc. — those need `add-native` or a re-run of `ship`.
+1. **Web-only changes (UI, copy, logic, styling) →** rebuild dist,
+   upload as a new OTA bundle, flip the active row. Installed apps pick
+   it up on next launch. Most updates fall here.
+2. **Edge function changes (`supabase/functions/*`) →** Lovable does NOT
+   auto-deploy edge functions. Tell the user to ask Lovable to deploy
+   and verify with `curl`.
+3. **Native code changes (new plugins, native config, app icon) →**
+   redirect to `add-native` or re-run `ship`. Apple does not allow OTA
+   delivery of native code; users must install the new TestFlight build.
 
-So this skill has three jobs depending on what the user actually changed:
-
-1. **Web-only changes (UI, copy, logic, styling) →** verify Lovable redeployed and the live URL serves the new version. Done.
-2. **Edge function changes (`supabase/functions/*`) →** Lovable does NOT auto-deploy edge functions. Tell the user to ask Lovable to deploy and verify with `curl`.
-3. **Native code changes (new plugins, native config) →** redirect to `add-native` skill or re-run `ship` to produce a new TestFlight/Play build.
+> 🆙 **Migrating from v1.x?** If the app was first shipped with v1.x
+> (`server.url = LOVABLE_URL`), follow `../ship/references/12-migration-guide.md`
+> first. The v1.x update model (Lovable redeploys → app sees new code on
+> next launch) doesn't apply here. Until the user updates to a v2.0
+> binary via TestFlight, OTA pushes won't reach them.
 
 ---
 
@@ -39,7 +49,8 @@ So this skill has three jobs depending on what the user actually changed:
 
 ### Step 1 — Identify what changed
 
-Ask the user what they changed in Lovable. Map to one of three buckets:
+Ask the user what they changed in Lovable. Map to one of the three
+buckets above:
 
 | User said | Bucket | Action |
 |---|---|---|
@@ -48,48 +59,126 @@ Ask the user what they changed in Lovable. Map to one of three buckets:
 | "Added camera / Face ID / push / new native plugin" | Native | Redirect to `add-native` |
 | "Changed app icon / splash screen / bundle ID" | Native config | Re-run `ship` |
 
-### Step 2 — Verify the Lovable redeploy reached the WebView
+### Step 2 — Web-only OTA push
 
-Load app memory:
+Load the app's memory file (`~/Documents/Claude/lovable-to-app-store/memory/apps/{bundle-id}.json`)
+to get `github_repo`, `lovable_url`, `supabase.project_ref`, and `ota`
+config (bucket name, edge-function URL, etc.).
+
+#### 2a. Pull the latest code
+
 ```bash
-ls ~/Documents/Claude/lovable-to-app-store/memory/apps/
+if [ -d "/tmp/lovable-to-app-store/{repo-name}" ]; then
+  cd /tmp/lovable-to-app-store/{repo-name} && git pull origin main
+else
+  git clone {github_repo} /tmp/lovable-to-app-store/{repo-name} --depth=1
+fi
 ```
-Find the matching app file by `app_name` or `bundle_id`. Read the `lovable_url` field.
 
-Verify the live URL is serving the latest code:
+#### 2b. Build the new bundle
+
 ```bash
-LOVABLE_URL="{lovable_url from memory}"
-curl -sI "$LOVABLE_URL" | head -5
-# Look at the Last-Modified header — should be recent (since the user's Lovable redeploy)
+NODE_OPTIONS=--max-old-space-size=2048 \
+  node_modules/.bin/vite build --config vite.config.prod.ts
+```
 
-# Also fetch the index and sanity-check
-curl -s "$LOVABLE_URL" | head -20
+Use `vite.config.prod.ts` (not the dev config) — it omits `lovable-tagger`
+which can hang on iCloud-synced projects.
+
+#### 2c. Zip + sha256
+
+```bash
+VERSION=$(date +%Y.%m.%d-%H%M%S)
+cd dist && zip -r "../bundle-${VERSION}.zip" . && cd ..
+SHA=$(shasum -a 256 "bundle-${VERSION}.zip" | awk '{print $1}')
+echo "Version: $VERSION  sha256: $SHA"
+```
+
+The version string can be any deterministic identifier — date+time
+guarantees monotonic ordering.
+
+#### 2d. Upload to Supabase Storage
+
+Use the Supabase CLI or the dashboard:
+
+```bash
+# Via Supabase CLI (recommended):
+supabase storage cp \
+  "bundle-${VERSION}.zip" \
+  "ota-bundles/ios/${VERSION}/bundle.zip"
+
+# OR upload via dashboard: Storage → ota-bundles → upload to ios/{VERSION}/
+```
+
+Same for Android if the app supports it
+(`ota-bundles/android/${VERSION}/bundle.zip`).
+
+#### 2e. Flip the active row in the database
+
+```bash
+SUPABASE_REF="{from memory: supabase.project_ref}"
+DB_PASSWORD="{from memory or env}"
+
+psql "postgresql://postgres:${DB_PASSWORD}@db.${SUPABASE_REF}.supabase.co:5432/postgres" <<SQL
+update ota_releases set active = false where platform = 'ios' and active = true;
+insert into ota_releases (platform, version, storage_path, sha256, active)
+values ('ios', '${VERSION}', 'ios/${VERSION}/bundle.zip', '${SHA}', true);
+SQL
+```
+
+For Android, do the same with `platform = 'android'`.
+
+#### 2f. Verify the manifest endpoint serves the new version
+
+```bash
+curl -s -X POST \
+  "https://${SUPABASE_REF}.supabase.co/functions/v1/ota-manifest" \
+  -H 'Content-Type: application/json' \
+  -d '{"platform": "ios", "currentVersion": "builtin"}'
+```
+
+Expected output:
+```json
+{
+  "update": true,
+  "url": "https://...signed-url...",
+  "version": "2026.04.29-093412",
+  "sha256": "..."
+}
 ```
 
 Confirm to the user:
+
 ```
-✅ Lovable URL is live and serving the latest deploy.
+✅ OTA bundle ${VERSION} pushed for {AppName}
 
-The app's WebView pulls from this URL on every launch, so installed apps
-will pick up the change automatically the next time someone opens them.
+Platform:  iOS (also Android: Y/N)
+Bundle:    bundle-${VERSION}.zip  (XX KB)
+SHA256:    ${SHA:0:16}…
+Active:    yes
 
-To force an immediate refresh on a test device:
+Installed apps will download + apply on next launch.
+For an immediate refresh on a test device:
   1. Force-quit the app (swipe up in app switcher)
-  2. Reopen — it will pull the new bundle
+  2. Reopen — it pulls the manifest, downloads the bundle, restarts
+  3. Reopen again — new bundle is now active
+
+If a tester is on the v1.x binary they won't see this update — they
+need to update to a v2.0 binary via TestFlight first.
 ```
 
-If the user added a hard offline mode (the `vite-plugin-pwa` service worker caches aggressively): a PWA service worker may serve a stale shell on first launch, then update in the background. The second launch shows the new version. This is normal PWA behavior — mention it if relevant.
+### Step 3 — Edge function changes
 
-### Step 3 — Handle edge function changes
-
-Lovable does **not** auto-deploy Supabase edge functions when you push web code. If the user changed anything under `supabase/functions/`, they have to ask Lovable explicitly:
+Lovable does **not** auto-deploy Supabase edge functions. If the user
+changed anything under `supabase/functions/`, they have to ask Lovable
+explicitly:
 
 > *"Please deploy the edge functions"*
 
 Verify deployment by curling each changed function:
 
 ```bash
-SUPABASE_REF="{supabase_project_id from memory or from .env}"
+SUPABASE_REF="{from memory}"
 FUNCTION_NAME="google-native-signin"  # or whatever changed
 
 curl -s -o /dev/null -w '%{http_code}\n' -X POST \
@@ -100,67 +189,54 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 If 404 → ask Lovable to deploy again. If 400 → function is live.
 
 Common cases this matters for:
-- `google-native-signin` (see `ship` skill `references/07-google-native-signin.md`)
-- `apple-native-signin` (see `ship` skill `references/08-apple-native-signin.md`)
+- `google-native-signin` (see `../ship/references/07-google-native-signin.md`)
+- `apple-native-signin` (see `../ship/references/08-apple-native-signin.md`)
+- `ota-manifest` (your own deploy via Lovable — needed for OTA to work at all)
 
-Update memory with the verification timestamp:
-```json
-"google_auth": { ..., "edge_function_last_verified": "YYYY-MM-DD" }
-```
+Update memory with the verification timestamp.
 
 ### Step 4 — Native changes redirect
 
 If the user said anything that implies native code changed:
-- "Added the camera", "added Face ID", "added push", "installed a new Capacitor plugin" → redirect to `add-native` skill
-- "Changed the app icon", "changed the splash", "changed the bundle ID", "changed the app name" → redirect to `ship` skill (these need a new build with the same workflow)
+
+- "Added the camera", "added Face ID", "added push", "installed a new
+  Capacitor plugin" → redirect to `add-native` skill
+- "Changed the app icon", "changed the splash", "changed the bundle ID",
+  "changed the app name" → redirect to `ship` skill (these need a new
+  build with the same workflow)
 
 Tell the user:
-> *"That kind of change can't be delivered as an OTA — installed apps run cached native code. I'll switch to the `add-native` skill (or re-run `ship`) to produce a new TestFlight/Play build with your changes."*
+
+> *"That kind of change can't be delivered as an OTA — installed apps run
+> cached native code. I'll switch to the `add-native` skill (or re-run
+> `ship`) to produce a new TestFlight build with your changes."*
 
 ---
 
-## Confirm and summarize
+## Rollback
 
-After successful verification:
+If a tester reports the new bundle is broken, you have two options:
+
+### A) Auto-rollback (already happens)
+
+If the new bundle has a JS error that prevents React from mounting, the
+SDK init snippet's `notifyAppReady()` call never fires. Capacitor
+Updater notices the 10-second `appReadyTimeout` expire and automatically
+rolls back to the previous healthy bundle on next launch. No manual
+intervention needed for crash-on-mount bugs.
+
+### B) Manual rollback (for "it loaded but does the wrong thing" bugs)
+
+Flip the active row back to the previous version:
+
+```sql
+update ota_releases set active = false where platform = 'ios' and active = true;
+update ota_releases set active = true where platform = 'ios' and version = '{previous-version}';
 ```
-✅ Update reached the app — {AppName}
 
-What changed:    [brief description from user]
-Update method:   Automatic OTA via Lovable URL (no CLI deploy needed)
-Live URL:        {lovable_url}
-Edge functions:  [if applicable] verified deployed (HTTP 400)
-
-Installed apps will load the new version on next launch.
-For an immediate refresh, force-quit and reopen the app.
-```
-
-Update `build.last_build_date` and (if applicable) `google_auth.edge_function_last_verified` in the memory file.
-
----
-
-## When OTA via server.url isn't enough
-
-The `server.url` approach is the simplest and works for ~95% of update scenarios. You'll hit its limits when:
-
-- **You want offline updates** — service worker caches the last successful load, but a totally offline user with a stale cache doesn't get the new version until they reconnect.
-- **You need version pinning per build** — every user always gets latest. There's no "rollout 10% to canary" capability.
-- **Lovable's hosting is down** — the WebView fails to load. The PWA cache covers this for users who've launched before, but new installs fail.
-
-For those cases, layering Capgo on top is an option — it bundles your `dist/` into the native app and serves locally with controlled rollout. **This requires extra setup that the default `ship` flow does not perform.** If the user wants Capgo:
-1. Sign up at [capgo.app](https://capgo.app), create a project for the bundle ID
-2. `npm install -g @capgo/cli` (or use `npx @capgo/cli` to avoid global install)
-3. Run `npx @capgo/cli init --apikey <your-capgo-key>` in the repo
-4. Save the API key, app ID, and channel into the app's memory file under a `capgo` block:
-   ```json
-   "capgo": {
-     "api_key": "...",
-     "app_id": "{bundle_id}",
-     "channel": "production"
-   }
-   ```
-5. Per-update push: `npx @capgo/cli bundle upload --apikey {api_key} --bundle-id {bundle_id} --channel {channel}`
-
-This is an advanced path — only walk the user through it if they specifically ask for bundled OTA, channel-based rollout, or offline-resilient updates.
+Then anyone who's already running the bad bundle: tell them to force-quit
++ reopen. The manifest now points at the older version, Capacitor Updater
+downloads it, applies, and the next launch is on the rollback bundle.
 
 ---
 
@@ -171,16 +247,17 @@ Read the error and attempt to fix it. Common issues:
 - Missing dependencies: run `npm install` and retry
 - Build script changed: check `package.json` scripts
 
-If still failing after 2 attempts, report the error to the user and suggest they check the Lovable build logs first.
+If still failing after 2 attempts, report the error to the user and
+suggest they check the Lovable build logs first.
 
 ## If the build succeeds but the resulting app shows a black screen
 
 Run the **pre-archive verification checklist** in
 `../ship/references/10-build-gotchas-addendum.md`. The most common silent
 black-screen cause is `UIMainStoryboardFile` being missing from
-`ios/App/App/Info.plist` — without it, iOS doesn't load `Main.storyboard`,
-so `CAPBridgeViewController` never instantiates and the app shows a bare
-black UIWindow + status bar. Verify with:
+`ios/App/App/Info.plist` — without it, iOS doesn't load
+`Main.storyboard`, so `CAPBridgeViewController` never instantiates and
+the app shows a bare black UIWindow + status bar. Verify with:
 
 ```bash
 /usr/libexec/PlistBuddy -c 'Print :UIMainStoryboardFile' \

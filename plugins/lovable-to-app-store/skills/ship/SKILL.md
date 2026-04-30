@@ -29,6 +29,15 @@ tools:
 
 Wrap a Lovable/GitHub web app as a native iOS + Android app and submit to TestFlight and Google Play. This skill uses frozen, battle-tested templates — no code is regenerated from scratch.
 
+> **v2.0 architecture (default):** apps ship with bundled `dist/` web
+> assets inside the .ipa, plus `@capgo/capacitor-updater` pulling OTA
+> bundles from your own Supabase Storage bucket. This avoids Apple's
+> Guideline 4.2 ("Minimum Functionality") risk that the v1.x web-shell
+> pattern triggered, and prevents bad live-site deploys from bricking
+> installed apps. Read `references/11-bundled-ota.md` for the full
+> architecture before starting. Migrating an app from v1.x?
+> Read `references/12-migration-guide.md` first.
+
 ## ⚡ ALWAYS START HERE — Pre-flight (mandatory)
 
 Read `references/00-preflight.md` and run every check before doing anything else.
@@ -119,6 +128,12 @@ The `references/templates/` directory contains the exact files from the successf
 - `references/templates/capacitor.config.ts` → repo root (3 variables)
 - `references/templates/sdk-init-snippet.ts` → inject into `src/main.tsx` (3 variables)
 - `references/templates/info-plist-additions.xml` → add entries to `ios/App/App/Info.plist`
+- `references/templates/vite.config.prod.ts` → repo root (no substitutions)
+- `references/templates/index-html-boot-overlay.html` → splice into `index.html` (no substitutions)
+- `references/templates/ota-updater-client.ts` → `src/lib/ota-updater.ts` (2 variables)
+- `references/templates/ota-manifest-edge-function.ts` → `supabase/functions/ota-manifest/index.ts`
+- `references/templates/asc-submit.py` → repo root (used by build script + CI; no substitutions)
+- `references/templates/build-local.sh` → repo root if user wants local builds (8 variables)
 
 ---
 
@@ -146,7 +161,9 @@ The `references/templates/` directory contains the exact files from the successf
 - `references/07-google-native-signin.md` — **Google Sign-In via Supabase Edge Function (April 2026)**
 - `references/08-apple-native-signin.md` — **Apple Sign-In via Supabase Edge Function (April 2026)**
 - `references/09-returning-client-fast-path.md` — **Fast path for returning clients (existing org with all 5 secrets in GitHub)**
-- `references/10-build-gotchas-addendum.md` — **April 2026 build gotchas (ITMS-91061, provisioning, /tmp clearing)**
+- `references/10-build-gotchas-addendum.md` — **All known silent-failure causes + the pre-archive verification checklist**
+- `references/11-bundled-ota.md` — **v2.0 architecture: bundled dist + Capacitor Updater + Supabase Storage OTA**
+- `references/12-migration-guide.md` — **v1.x → v2.0 migration path (existing apps shipped on server.url)**
 - `references/templates/` — **Frozen template files — copy these, never regenerate**
 
 ---

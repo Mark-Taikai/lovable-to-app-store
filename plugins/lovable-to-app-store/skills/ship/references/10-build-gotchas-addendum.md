@@ -251,6 +251,183 @@ a step before `xcodebuild archive`.
 
 ---
 
+## Pre-flight on simulator BEFORE TestFlight upload
+
+**Why:** TestFlight processing + propagation = 5–15 minutes per upload. If
+your build has a bug, that's wasted round-trip time. A simulator install
+takes 90 seconds and reproduces the same bundled assets, native plugins,
+and Capacitor wiring. Catching a regression there saves hours.
+
+**Recipe:**
+
+```bash
+# Build for simulator with the SAME source — no signing required
+DEVICE_ID=$(xcrun simctl list devices available \
+  | grep -E '^\s+iPhone 1[5-9] Pro \(' | head -1 \
+  | grep -oE '\([0-9A-F-]{36}\)' | tr -d '()')
+xcrun simctl boot "$DEVICE_ID" 2>/dev/null || true
+open -a Simulator
+
+xcodebuild build \
+  -workspace ios/App/App.xcworkspace \
+  -scheme App \
+  -configuration Debug \
+  -destination "platform=iOS Simulator,id=$DEVICE_ID" \
+  -derivedDataPath /tmp/sim-derived \
+  CODE_SIGNING_ALLOWED=NO
+
+APP=$(find /tmp/sim-derived/Build/Products -name 'App.app' -path '*Simulator*' | head -1)
+xcrun simctl install "$DEVICE_ID" "$APP"
+xcrun simctl launch "$DEVICE_ID" {{BUNDLE_ID}}
+
+sleep 8
+xcrun simctl io "$DEVICE_ID" screenshot /tmp/sim-test.png
+open /tmp/sim-test.png
+```
+
+If the simulator screenshot shows your actual login screen → the build
+is good, archive + upload. If it shows a black screen or the boot-error
+overlay → fix it locally before burning a TestFlight slot.
+
+The app-publisher memory file should record `simulator_test_passed` per
+build to enforce this in future workflows.
+
+---
+
+## Verify the archive's embedded provisioning profile is AppStore type
+
+**Symptom:** `xcodebuild archive` succeeds. Upload to TestFlight fails
+with "Invalid Binary" or "Distribution-only signing required."
+
+**Root cause:** Your pbxproj or CLI flags ended up using Apple
+Development cert + Team Provisioning Profile (which is for development
+sideloading), not Apple/iPhone Distribution + App Store profile.
+TestFlight requires the latter.
+
+**Fix:** verify before uploading:
+
+```bash
+APP=~/finally-archive/Build${N}.xcarchive/Products/Applications/App.app
+
+# 1. Profile type
+security cms -D -i "$APP/embedded.mobileprovision" 2>/dev/null \
+  | python3 -c '
+import plistlib, sys
+d = plistlib.loads(sys.stdin.buffer.read())
+type_ = "AppStore" if not d.get("ProvisionedDevices") and d.get("ProvisionsAllDevices") is None else "Dev/AdHoc"
+print("Type:", type_, "  Name:", d.get("Name"))
+'
+# Must say  Type: AppStore  Name: ... AppStore
+
+# 2. Cert authority
+codesign -dvv "$APP" 2>&1 | grep '^Authority='
+# Must include "Apple Distribution" or "iPhone Distribution"
+# If you see "Apple Development" → build was Dev-signed, will fail upload
+```
+
+The `templates/build-local.sh` template runs both checks automatically
+between archive and export, so you can't accidentally upload a
+Dev-signed binary.
+
+---
+
+## NEVER pass `CODE_SIGN_STYLE` or `CODE_SIGN_IDENTITY` on the xcodebuild CLI
+
+**Symptom:** `xcodebuild archive` says it's using Manual signing with
+your Distribution cert, but the embedded.mobileprovision in the produced
+archive is a Development profile, signed with Apple Development cert.
+Upload fails.
+
+**Root cause:** xcodebuild CLI signing overrides do **not** propagate to
+SPM dependency targets like RevenueCat, RevenueCatUI, or any other
+Swift Package Manager package. They keep their own per-target signing
+settings from the pbxproj, which default to "automatic" and pick the
+first available cert (usually Apple Development).
+
+**Fix:** patch signing into pbxproj globally with Python BEFORE running
+`xcodebuild archive`. This affects every target in the file (app + SPM
+dependencies + CocoaPods targets). See `04-build-and-submit.md` Step 2
+for the canonical Python snippet, or use `templates/build-local.sh`
+which calls it for you.
+
+Then run xcodebuild **without** any signing-related flags:
+
+```bash
+xcodebuild archive \
+  -workspace ios/App/App.xcworkspace \
+  -scheme App \
+  -configuration Release \
+  -destination 'generic/platform=iOS' \
+  -archivePath /tmp/Build.xcarchive \
+  DEVELOPMENT_TEAM=$TEAM_ID \
+  "OTHER_CODE_SIGN_FLAGS=--keychain $KEYCHAIN"
+  # NO CODE_SIGN_STYLE, NO CODE_SIGN_IDENTITY, NO PROVISIONING_PROFILE_SPECIFIER
+```
+
+---
+
+## Parallel build instances duplicate the Podfile post_install hook
+
+**Symptom:** `pod install` fails with `[!] Invalid Podfile: Specifying
+multiple post_install hooks is unsupported.`
+
+**Root cause:** You ran two build scripts at the same time. The first
+re-applied the privacy-manifest hook (which `cap sync` had wiped). The
+second saw a Podfile that already had the hook, didn't recognize it as
+a duplicate of its OWN re-injection, and appended again. Now the file
+has two `post_install do |installer|` blocks.
+
+**Fix:** put a lock file at the top of every build script. Refuse to
+run if another instance is going. The `templates/build-local.sh`
+template has the canonical pattern:
+
+```bash
+LOCKFILE=/tmp/myapp-build.lock
+if [ -f "$LOCKFILE" ]; then
+  PID=$(cat "$LOCKFILE")
+  if ps -p "$PID" > /dev/null 2>&1; then
+    echo "Another instance running (PID $PID). Aborting."; exit 1
+  fi
+  rm -f "$LOCKFILE"
+fi
+echo $$ > "$LOCKFILE"
+trap "rm -f $LOCKFILE" EXIT
+```
+
+If you do hit the duplicate-hook error, manually edit `ios/App/Podfile`
+to delete one of the `post_install do ... end` blocks before re-running.
+
+---
+
+## PurchasesHybridCommon: missing Swift files after pod install
+
+**Symptom:** `xcodebuild archive` fails repeatedly with errors like:
+
+```
+error: Error opening input file '.../Pods/PurchasesHybridCommon/ios/PurchasesHybridCommon/PurchasesHybridCommon/VirtualCurrency+HybridAdditions.swift' (No such file or directory)
+```
+
+…even though `pod install` completed without errors.
+
+**Root cause:** Your local CocoaPods cache has an incomplete copy of the
+`PurchasesHybridCommon` pod. When pod install runs, it sees the cached
+podspec and copies what it has — which is missing the Swift files that
+were added in a later release. The Podfile.lock claims version X but
+the on-disk pod is missing files from version X.
+
+**Fix:** clear the pod cache for that specific pod, then reinstall:
+
+```bash
+pod cache clean PurchasesHybridCommon --all
+rm -rf ios/App/Pods ios/App/Podfile.lock
+cd ios/App && pod install --repo-update
+```
+
+The `--repo-update` flag forces CocoaPods to refresh its specs index
+before install, picking up the latest podspec versions.
+
+---
+
 ## ITMS-90683: Missing NSLocationWhenInUseUsageDescription
 
 **Symptom:** Apple emails after upload warning about missing purpose string in Info.plist.

@@ -1,0 +1,98 @@
+<!--
+  BOOT-TIME ERROR OVERLAY — paste these two <script> blocks into index.html
+  ===========================================================================
+  Why: when something goes wrong inside a native WebView there are no logs
+       visible to the user. Without this overlay, a JS bundle that fails to
+       load or a runtime error before React mounts produces a pure-black or
+       blank screen with no diagnostic. With it, you get a white page
+       containing the actual error message + a Retry button.
+
+  How: paste the FIRST <script> just inside <body>, BEFORE the React mount
+       script tag. Paste the SECOND <script> at the very END of <body>,
+       AFTER the React mount script.
+
+  This is exactly the pattern Finally uses (and what saved the day during
+  the Build 20–37 black-screen debugging — well, would have saved the day
+  if the blackscreen was a JS error and not a missing UIMainStoryboardFile).
+-->
+
+<!-- 1️⃣  FIRST: just inside <body>, BEFORE the React mount script.
+     Empty mount target + service-worker cleanup + the boot-error overlay JS. -->
+<div id="root"></div>
+<script>
+  // One-time: nuke stale service workers + caches so the new bundle
+  // takes over after an OTA. Service workers cause "stale shell" issues
+  // when the WebView caches the old index.html and then can't find new
+  // chunk files referenced by the new bundle.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function (regs) {
+      regs.forEach(function (r) { r.unregister(); });
+      if (regs.length) caches.keys().then(function (k) {
+        k.forEach(function (c) { caches.delete(c); });
+      });
+    });
+  }
+</script>
+<script>
+  // Boot-time error overlay: if anything throws before React mounts (most
+  // commonly inside a native WebView where the user can't see DevTools logs),
+  // paint the error onto the page so we never see an unrecoverable black
+  // screen. Removed automatically by main.tsx once React renders into #root.
+  (function () {
+    var BOOT_FLAG = '__finally_booted__'; // sentinel set by main.tsx after createRoot
+    function showBootError(label, detail) {
+      try {
+        var root = document.getElementById('root');
+        if (root && root.childElementCount > 0) return; // React already mounted
+        if (window[BOOT_FLAG]) return;
+        var box = document.createElement('div');
+        box.setAttribute('data-boot-error', '1');
+        box.style.cssText = 'position:fixed;inset:0;z-index:2147483647;padding:24px;background:#fff;color:#0a0a0a;font:14px/1.5 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;overflow:auto;-webkit-user-select:text;user-select:text;';
+        box.innerHTML =
+          '<div style="max-width:520px;margin:40px auto;">' +
+          '<div style="font-weight:600;font-size:18px;margin-bottom:12px;">App couldn’t start</div>' +
+          '<div style="color:#555;margin-bottom:16px;">A boot-time error stopped the app from loading. Tap Retry to try again, or share the message below with support.</div>' +
+          '<pre style="background:#f5f5f5;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-word;font-size:12px;color:#b00020;">' +
+          String(label) + '\n\n' + String(detail || '') +
+          '</pre>' +
+          '<button id="__boot_retry" style="margin-top:16px;padding:12px 20px;border-radius:999px;border:0;background:#0a0a0a;color:#fff;font-weight:500;">Retry</button>' +
+          '</div>';
+        document.body.appendChild(box);
+        var btn = document.getElementById('__boot_retry');
+        if (btn) btn.addEventListener('click', function () { window.location.reload(); });
+      } catch (_) { /* if this throws too, nothing we can do */ }
+    }
+    window.addEventListener('error', function (e) {
+      showBootError('Error: ' + (e && e.message ? e.message : 'unknown'),
+                    e && e.error && e.error.stack);
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      var r = e && e.reason;
+      showBootError('Unhandled rejection',
+                    (r && (r.stack || r.message)) || String(r));
+    });
+    // If the bundle never executes within 8 seconds, surface that too.
+    // Common causes: missing chunk file (404), CSP blocking the script,
+    // Capacitor scheme handler not registered for the bundled scheme.
+    setTimeout(function () {
+      var root = document.getElementById('root');
+      if (!window[BOOT_FLAG] && root && root.childElementCount === 0) {
+        showBootError('App did not start within 8 seconds.',
+                      'The JavaScript bundle may have failed to load. ' +
+                      'Check your connection and try Retry.');
+      }
+    }, 8000);
+  })();
+</script>
+
+<!-- 2️⃣  AFTER your existing React mount script. main.tsx must set
+     window.__finally_booted__ = true (or whatever flag you chose above)
+     once createRoot().render() has been called — that suppresses the
+     8-second overlay timeout. Then remove any overlays that already fired:
+
+     // Top of src/main.tsx, after createRoot(...).render(<App />):
+     (window as any).__finally_booted__ = true;
+     queueMicrotask(() => {
+       document.querySelectorAll('[data-boot-error]').forEach(n => n.remove());
+     });
+-->

@@ -4,6 +4,101 @@ All notable changes to the `lovable-to-app-store` plugin are documented here. Fo
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-04-29
+
+**Breaking change.** New apps default to bundled-dist + Capacitor Updater
+OTA. Existing apps shipped on v1.x (`server.url = LOVABLE_URL`) keep
+working but should follow `references/12-migration-guide.md` to switch
+to the v2.0 architecture before their next App Store submission.
+
+This release captures every lesson learned shipping Finally — the app
+that burned 17 TestFlight builds chasing a black screen caused by a
+silently-deleted Info.plist key. v2.0 makes those failure modes
+impossible to reproduce.
+
+### Changed (breaking)
+
+- **Default architecture is now bundled-dist + Capacitor Updater OTA**,
+  not `server.url`. The frozen `capacitor.config.ts` template defaults
+  to `webDir: 'dist'` with no `server.url` in production. The Lovable
+  URL is now used only for dev hot-reload (gated by `CAP_DEV_RELOAD=1`
+  env var so it can never accidentally ship to TestFlight).
+- **OTA delivery moved from "Lovable redeploys → app sees on next launch"
+  to `@capgo/capacitor-updater` pulling from your own Supabase Storage**
+  bucket via signed URLs. Full setup in `references/11-bundled-ota.md`.
+  This avoids Apple Guideline 4.2 ("Minimum Functionality" / web shell
+  rejection) and prevents bad live-site deploys from bricking installed
+  apps.
+- **`update` skill rewritten** for the new OTA model. It now builds the
+  bundle, computes sha256, uploads to Storage, and flips the active row
+  in the `ota_releases` table. The v1.x model (verify Lovable redeploy
+  → done) is replaced.
+- **`sdk-init-snippet.ts` now calls `CapacitorUpdater.notifyAppReady()`**
+  on mount, registers an `appStateChange` listener for resume-time
+  re-checks, and uses dynamic imports for every native plugin so a
+  broken plugin can't break React's initial mount.
+
+### Added
+
+- `references/11-bundled-ota.md` — full architecture explainer for the
+  bundled-dist + Capacitor Updater + Supabase Storage pattern, with
+  setup steps for the edge function, ota_releases table, and Storage
+  bucket.
+- `references/12-migration-guide.md` — step-by-step v1.x → v2.0 migration
+  for existing apps, including how to handle the "two installed
+  populations" transition window (v1.x users on live URL vs. v2.0 users
+  on bundled+OTA).
+- `templates/index-html-boot-overlay.html` — boot-time error overlay
+  that paints a white page with the actual JS error if anything fails
+  before React mounts. Eliminates the "user reports black screen, no
+  way to know why" disaster mode.
+- `templates/vite.config.prod.ts` — production-only vite config that
+  omits `lovable-tagger` (hangs on iCloud-synced projects) and
+  `vite-plugin-pwa` (irrelevant in native shell), with a
+  `stripCrossorigin` plugin for Capacitor scheme compatibility.
+- `templates/ota-updater-client.ts` — `src/lib/ota-updater.ts`
+  implementation: POST to manifest endpoint, download with sha256
+  verification, stage for next launch.
+- `templates/ota-manifest-edge-function.ts` — Supabase edge function
+  that returns the active `ota_releases` row + signed URL.
+- `templates/asc-submit.py` — App Store Connect API automation script
+  (Python + PyJWT + urllib): poll for VALID processing → set export
+  compliance → add to external Beta Testers group → submit for Beta
+  App Review. Replaces all manual ASC web-UI clicks. Apple typically
+  auto-approves Beta Review for revisions of approved apps within
+  minutes.
+- `templates/build-local.sh` — idempotent local-Mac build script with
+  lock file (prevents parallel-instance Podfile-hook duplication),
+  fresh pod cache, full pre-archive verification, AppStore-profile
+  enforcement, and asc-submit.py invocation.
+- New gotchas in `10-build-gotchas-addendum.md`:
+  - Pre-flight on simulator BEFORE TestFlight upload (90-second
+    feedback vs 30+ min round-trip)
+  - Verify the archive's `embedded.mobileprovision` is `AppStore` type
+    (not `Dev/AdHoc`) before uploading
+  - NEVER pass `CODE_SIGN_STYLE` or `CODE_SIGN_IDENTITY` on xcodebuild
+    CLI — overrides don't propagate to SPM dependencies
+  - Parallel build instances duplicate the Podfile post_install hook
+    (mitigation: lock file at script start)
+  - PurchasesHybridCommon: missing Swift files after pod install
+    (mitigation: `pod cache clean PurchasesHybridCommon --all` + fresh
+    install)
+
+### Fixed
+
+- `info-plist-additions.xml` template now leads with `UIMainStoryboardFile`
+  + `UILaunchStoryboardName` under a "DO NOT REMOVE" warning banner.
+- The frozen `capacitor.config.ts` template now includes inline notes
+  explaining why `iosScheme: 'https'` must NOT be set (Capacitor's
+  `normalize()` silently rejects it because WKWebView reserves `https`).
+
+### Migration timeline
+
+- v1.x apps continue to work — no urgent action required for shipped apps.
+- For new apps: the v2.0 templates are the only path.
+- For v1.x apps about to go through Apple App Store review: read
+  `references/12-migration-guide.md` and migrate before submission.
+
 ## [1.1.2] — 2026-04-29
 
 ### Fixed
