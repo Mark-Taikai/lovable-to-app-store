@@ -8,8 +8,8 @@
     {
       "name": "lovable-to-app-store",
       "source": "./plugins/lovable-to-app-store",
-      "description": "Ship Lovable apps to iOS TestFlight and Google Play. Wraps apps in Capacitor with bundled dist (Apple Guideline 4.2 compliant by default), registers services (RevenueCat, OneSignal, Capacitor Updater), builds, signs with Distribution cert, uploads via altool, and submits to Beta App Review via the App Store Connect API — with zero app store knowledge required. OTA updates ship from your own Supabase Storage bucket with sha256 verification + automatic 10-second rollback safety. Includes native Google/Apple Sign-In via Supabase Edge Functions and battle-tested defenses against silent-failure causes.",
-      "version": "2.0.0",
+      "description": "Ship Lovable apps to iOS TestFlight and Google Play. Wraps apps in Capacitor with bundled dist (Apple Guideline 4.2 compliant by default), registers services (RevenueCat, OneSignal, Capacitor Updater), builds, signs with Distribution cert, uploads via altool, and submits to Beta App Review via the App Store Connect API \u2014 with zero app store knowledge required. OTA updates ship from your own Supabase Storage bucket with sha256 verification + automatic 10-second rollback safety. Includes native Google/Apple Sign-In via Supabase Edge Functions and battle-tested defenses against silent-failure causes.",
+      "version": "2.0.1",
       "category": "mobile",
       "tags": [
         "lovable",

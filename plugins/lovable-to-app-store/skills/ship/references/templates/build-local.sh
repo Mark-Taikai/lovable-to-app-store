@@ -56,8 +56,8 @@ PROFILE_UUID={{PROVISIONING_PROFILE_UUID}}     # e.g. 37d39993-...
 KEYCHAIN={{KEYCHAIN_PATH}}                      # e.g. ~/Library/Keychains/build.keychain-db
 
 # App Store Connect API
-API_KEY_ID={{ASC_KEY_ID}}                       # e.g. 98L745RB8A
-API_ISSUER={{ASC_ISSUER_ID}}                   # e.g. 88df78c0-...
+API_KEY_ID={{ASC_KEY_ID}}                       # 10-char ID from ASC Users and Access -> Integrations -> Keys
+API_ISSUER={{ASC_ISSUER_ID}}                   # UUID from same page (top-right)
 
 cd $BASE
 echo "=== BUILD $BUILD_NUM START $(date) ===" | tee $LOG

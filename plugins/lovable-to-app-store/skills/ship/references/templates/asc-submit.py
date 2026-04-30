@@ -22,7 +22,7 @@ USAGE
     --group-name "Beta Testers"
 
 ENV / FLAGS
-  --key-id      ASC API Key ID (e.g. 98L745RB8A) — or env ASC_KEY_ID
+  --key-id      ASC API Key ID (10-char alphanumeric) — or env ASC_KEY_ID
   --issuer-id   ASC API Issuer UUID                — or env ASC_ISSUER_ID
   --key-path    Path to AuthKey_*.p8 file          — or env ASC_KEY_PATH
                 Default: ~/.private_keys/AuthKey_<KEY_ID>.p8

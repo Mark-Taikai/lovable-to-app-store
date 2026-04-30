@@ -4,6 +4,19 @@ All notable changes to the `lovable-to-app-store` plugin are documented here. Fo
 
 ## [Unreleased]
 
+## [2.0.1] — 2026-04-29
+
+### Security
+
+- **Removed real ASC API Key ID and Issuer UUID values** that were
+  accidentally committed as "example" comments in `templates/asc-submit.py`
+  and `templates/build-local.sh` in v2.0.0. These IDs are not credentials
+  on their own (they require the matching `.p8` private key to authenticate),
+  but they identify the maintainer's specific App Store Connect setup
+  and shouldn't have been published. Replaced with generic placeholders.
+- Recommended action for anyone using v2.0.0 templates as-is: use your
+  own Key ID / Issuer / .p8, not the example values from the comments.
+
 ## [2.0.0] — 2026-04-29
 
 **Breaking change.** New apps default to bundled-dist + Capacitor Updater
