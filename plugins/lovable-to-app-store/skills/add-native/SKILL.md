@@ -84,6 +84,25 @@ npm install {package-name}
 npx cap sync
 ```
 
+> ⚠️ **`npx cap sync` regenerates `ios/App/Podfile` from scratch and wipes
+> any custom `post_install` hook.** If the project has a privacy-manifest
+> hook (for ITMS-91061 — GoogleSignIn / GTMAppAuth / GTMSessionFetcher),
+> you MUST re-apply it after `cap sync`. See
+> `../ship/references/10-build-gotchas-addendum.md` →
+> "cap sync wipes the Podfile post_install hook" for the canonical
+> Python/sed snippet to re-inject it.
+
+> ⚠️ **Capacitor version alignment.** If you bump any `@capacitor/*`
+> package, bump them ALL to the same major version. CLI v6 with core v8
+> generates broken configs (silent runtime failures). CLI v8.3+ requires
+> Node 22+. Check with:
+> ```bash
+> node -p "require('./node_modules/@capacitor/cli/package.json').version"
+> node -p "require('./node_modules/@capacitor/core/package.json').version"
+> node -p "require('./node_modules/@capacitor/ios/package.json').version"
+> # All three must share the same major.
+> ```
+
 ### Step 5: Add permissions to native projects
 
 **iOS — Info.plist** (`ios/App/App/Info.plist`):

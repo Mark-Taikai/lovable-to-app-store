@@ -172,3 +172,23 @@ Read the error and attempt to fix it. Common issues:
 - Build script changed: check `package.json` scripts
 
 If still failing after 2 attempts, report the error to the user and suggest they check the Lovable build logs first.
+
+## If the build succeeds but the resulting app shows a black screen
+
+Run the **pre-archive verification checklist** in
+`../ship/references/10-build-gotchas-addendum.md`. The most common silent
+black-screen cause is `UIMainStoryboardFile` being missing from
+`ios/App/App/Info.plist` — without it, iOS doesn't load `Main.storyboard`,
+so `CAPBridgeViewController` never instantiates and the app shows a bare
+black UIWindow + status bar. Verify with:
+
+```bash
+/usr/libexec/PlistBuddy -c 'Print :UIMainStoryboardFile' \
+                        ios/App/App/Info.plist
+# Must print "Main".
+```
+
+Other silent causes covered in the gotchas addendum:
+- `iosScheme: 'https'` in capacitor.config (silently rejected → black)
+- Capacitor CLI / core / ios major version mismatch
+- `cap sync` wiped the Podfile post_install hook → ITMS-91061 on next upload

@@ -1,6 +1,24 @@
 <!-- INFO.PLIST ADDITIONS — add these inside the root <dict> of ios/App/App/Info.plist -->
 <!-- These apply to every app shipped with this plugin -->
 
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- ⚠️  VERIFY (DO NOT REMOVE) — UIMainStoryboardFile + UILaunchStoryboardName -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- `npx cap add ios` scaffolds these two keys for you. They MUST stay.       -->
+<!-- Without UIMainStoryboardFile, iOS never loads Main.storyboard, so         -->
+<!-- CAPBridgeViewController never instantiates, no WebView is created, and    -->
+<!-- the app launches into a pure-black UIWindow + status bar — no JS errors,  -->
+<!-- no crash, no Capacitor logs. The most painful debug experience possible. -->
+<!-- See references/10-build-gotchas-addendum.md for the post-mortem.          -->
+<!-- Verification command:                                                     -->
+<!--   /usr/libexec/PlistBuddy -c 'Print :UIMainStoryboardFile' \              -->
+<!--                            ios/App/App/Info.plist                          -->
+<!--   # Must print "Main" — if "Does Not Exist", add the key back.            -->
+<key>UIMainStoryboardFile</key>
+<string>Main</string>
+<key>UILaunchStoryboardName</key>
+<string>LaunchScreen</string>
+
 <!-- Bypass Apple export compliance dialog for every build.
      Apps using only standard HTTPS/TLS qualify for this exemption.
      Without this, every TestFlight upload shows "Missing Compliance" requiring manual dismissal. -->

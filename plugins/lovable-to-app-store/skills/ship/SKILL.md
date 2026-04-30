@@ -69,7 +69,29 @@ If the app uses **Google Sign-In** or **Apple Sign-In**, the URL-scheme step in 
 Both flows require the Edge Function to be deployed by Lovable explicitly — verify with `curl` (should return 400, not 404) before testing the build.
 
 ### Step 5: Build and Submit
-GitHub Actions CI handles this automatically after push. Read `references/04-build-and-submit.md` only if CI fails after 3 runs. Also consult `references/10-build-gotchas-addendum.md` for ITMS-91061 (GoogleSignIn privacy manifest), provisioning-profile invalidation after enabling Sign in with Apple, and other April-2026 gotchas.
+
+**MANDATORY pre-archive check** (whether building locally or via CI):
+run the verification block in `references/10-build-gotchas-addendum.md`
+under "Pre-archive verification checklist". It checks for:
+
+- `UIMainStoryboardFile = Main` in Info.plist (silent black screen if missing)
+- No `iosScheme: 'https'` in capacitor.config.ts (silently rejected, breaks WebView)
+- Capacitor CLI / core / ios all on the same major version
+- Node 22+ (required by Capacitor CLI v8.3+)
+- Podfile post_install hook present (was wiped by last `cap sync`?)
+- GoogleSignIn pod >= 7.1.0 (avoids ITMS-91061)
+- public/index.html bundled
+
+If any check fails, fix it BEFORE invoking `xcodebuild archive`. Each of
+these has caused multi-hour debug sessions in the wild because the
+TestFlight upload looks fine and the symptom (black screen on launch) gives
+no logs.
+
+GitHub Actions CI handles archive + upload automatically after push. Read
+`references/04-build-and-submit.md` only if CI fails after 3 runs. Also
+consult `references/10-build-gotchas-addendum.md` for the other gotchas
+(ITMS-91061, provisioning-profile invalidation after enabling Sign in with
+Apple, and the rest).
 
 ### Step 6: Save Memory
 Read `references/05-memory-schema.md`. Save after every step that produces a new ID or key. If Google or Apple Sign-In was wired up, also persist the `google_auth` / `apple_auth` blocks documented at the bottom of refs 07 and 08.

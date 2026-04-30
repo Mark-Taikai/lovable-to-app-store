@@ -4,6 +4,25 @@ All notable changes to the `lovable-to-app-store` plugin are documented here. Fo
 
 ## [Unreleased]
 
+## [1.1.2] — 2026-04-29
+
+### Fixed
+- **The "silent black screen" disaster.** Documented the worst silent-failure mode in the entire pipeline: when `ios/App/App/Info.plist` is missing the `UIMainStoryboardFile = Main` key, iOS never loads `Main.storyboard`, so `CAPBridgeViewController` never instantiates, no WKWebView is created, and the app launches into a bare black `UIWindow` + status bar — no JS errors, no crash, no Capacitor logs. The symptom looks identical to a WKWebView that loaded but never finished navigation, leading to hours of misdirected debugging. `npx cap add ios` scaffolds the key correctly, but agents/users doing manual cleanup of Info.plist sometimes delete it. The frozen `info-plist-additions.xml` template now includes the key with a giant warning banner, and the build-gotchas addendum opens with the post-mortem and a `PlistBuddy` verification command.
+- **`iosScheme: 'https'` is silently rejected** by Capacitor's `InstanceDescriptor.normalize()` because WKWebView reserves `https`. Setting it diverges the WebView's registered scheme handler from where the bundled config thinks the URL is, which fails navigation and produces a black screen on launch. The frozen `capacitor.config.ts` now explicitly omits `iosScheme` and includes a header comment + inline note explaining why.
+- **Root-level `backgroundColor: '#ffffff'`** is now in the frozen `capacitor.config.ts`. Without it, the WKWebView falls through to `UIColor.systemBackground` during loading — which is BLACK in iOS dark mode. With it, any loading hiccup shows white instead of an unrecoverable black screen.
+- **`ios.webContentsDebuggingEnabled: true`** added to the frozen `capacitor.config.ts`. Lets Safari Web Inspector attach to TestFlight builds — no user-facing effect, just a debugging on-ramp when something breaks.
+- **`cap sync` wipes the Podfile `post_install` hook every time** — newly documented in the gotchas addendum with a canonical Python re-injection snippet. The privacy-manifest hook (for ITMS-91061) MUST be re-applied after every `cap sync`. Both `add-native` and `update` skills now warn explicitly.
+- **Capacitor CLI / core / ios version mismatch** is a silent-failure cause now documented in the gotchas. CLI v6 with core v8 generates a config the runtime can't parse correctly, producing black screens or unregistered plugins. Plus: CLI v8.3+ requires Node 22+. The `add-native` skill now reminds you to bump all three packages together.
+- **Sign-in-with-Apple button rendering blank white in WKWebView.** When the button uses `bg-white/10` + `backdrop-blur-sm` + `text-white`, WebKit sometimes renders it as solid white-on-white. Documented in the gotchas with a working HIG-compliant solid-black variant.
+
+### Added
+- **Pre-archive verification checklist** (`10-build-gotchas-addendum.md`) — a 30-second bash block that fails fast on the silent-failure causes (UIMainStoryboardFile missing, iosScheme:'https' present, version mismatch, missing post_install hook, GoogleSignIn pod < 7.1.0, missing public/index.html). Now mandatory in the `ship` skill before any `xcodebuild archive` invocation.
+- Cross-references from `update` skill → gotchas addendum so when an update produces a black screen, the path to diagnosis is one click away.
+
+### Changed
+- `info-plist-additions.xml` template restructured to lead with the load-bearing keys (UIMainStoryboardFile / UILaunchStoryboardName) under a giant warning banner, rather than treating them as scaffolded-and-forgotten.
+- `04-build-and-submit.md` header callout expanded to list the silent-failure causes and link to the pre-archive checklist.
+
 ## [1.1.1] — 2026-04-27
 
 ### Fixed

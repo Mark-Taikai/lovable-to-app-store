@@ -1,6 +1,8 @@
 # Build and Submit
 
-> See also `references/10-build-gotchas-addendum.md` for April 2026 gotchas (ITMS-91061 GoogleSignIn privacy manifest, provisioning profile invalidation after enabling capabilities, /tmp clearing between sessions, BglocationCapacitor pod removal, CocoaPods Unicode encoding fix).
+> See also `references/10-build-gotchas-addendum.md` for the **silent-failure causes** that cost the most debug time (UIMainStoryboardFile missing = silent black screen, iosScheme:'https' silently rejected, cap sync wiping the Podfile post_install hook, Capacitor CLI/core version mismatch, Sign-in-with-Apple button white-on-white, plus the standard April 2026 issues — ITMS-91061 GoogleSignIn privacy manifest, provisioning profile invalidation after enabling capabilities, /tmp clearing between sessions, BglocationCapacitor pod removal, CocoaPods Unicode encoding).
+>
+> **Run the pre-archive verification checklist** in `10-build-gotchas-addendum.md` before every `xcodebuild archive`. It catches in 30 seconds what TestFlight processing won't fail on for 30 minutes.
 
 ## ⚠️ Before you commit anything: secret hygiene
 
