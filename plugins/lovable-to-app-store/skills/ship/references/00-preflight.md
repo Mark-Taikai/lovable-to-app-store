@@ -4,6 +4,102 @@ These checks take under 60 seconds and catch the issues that previously caused h
 
 ---
 
+## Step 0: Environment Handshake (auto-install + prompt-install)
+
+Before any account or memory work, verify the runtime can do what `ship` needs.
+
+### 0a. Bash sandbox + tools
+
+```bash
+node --version 2>&1
+python3 --version 2>&1
+git --version 2>&1
+zip --version 2>&1 | head -1
+```
+
+Required minimums:
+- `node ≥ 22` (Capacitor CLI v8.3+ requires Node 22)
+- `python3 ≥ 3.10`
+- `git`, `zip`
+
+If any tool is missing, the runtime is broken — STOP and tell the user. The Cowork bash sandbox normally has all of these; if it doesn't, ask the user to restart Cowork.
+
+### 0b. Python packages we'll need (auto-install)
+
+```bash
+python3 -c "import PIL, jwt, requests, cryptography" 2>&1 || \
+  pip install --break-system-packages pillow pyjwt requests cryptography 2>&1 | tail -5
+```
+
+These are needed for: icon resizing (Pillow), ASC API JWT signing (pyjwt), API calls (requests), cert handling (cryptography). Auto-install is safe — they go into the sandbox, not the user's system Python.
+
+### 0c. GitHub CLI (auto-install on first run)
+
+```bash
+which gh 2>&1 || {
+  # Install gh into /tmp without sudo (works in Cowork's bash sandbox on aarch64 + amd64)
+  ARCH=$(uname -m)
+  case "$ARCH" in
+    aarch64|arm64) GH_ARCH="arm64" ;;
+    x86_64) GH_ARCH="amd64" ;;
+    *) echo "Unsupported arch: $ARCH"; exit 1 ;;
+  esac
+  cd /tmp
+  curl -sL "https://github.com/cli/cli/releases/download/v2.62.0/gh_2.62.0_linux_${GH_ARCH}.tar.gz" -o gh.tar.gz
+  tar xzf gh.tar.gz
+  echo "/tmp/gh_2.62.0_linux_${GH_ARCH}/bin/gh"
+}
+```
+
+`gh` is used to push to the user's GitHub account without manually-pasted PATs. If install fails, fall back to asking the user for a fine-grained PAT — but try the auto-install first.
+
+### 0d. Cowork Chrome extension (prompt-install — required for service registration)
+
+Make a no-op Chrome MCP call to test connectivity:
+
+```
+[Call mcp__Claude_in_Chrome__tabs_context_mcp with createIfEmpty:false]
+```
+
+- **If it returns successfully:** ✅ Chrome extension is connected. Proceed.
+- **If it errors with "no Chrome connected" / "extension not found" / similar:** STOP and tell the user:
+
+  > ⚠️ **Cowork Chrome extension required.** This skill drives Apple Developer Portal, App Store Connect, Google Play Console, RevenueCat, and OneSignal through your browser — it can't proceed without the extension installed and authorized.
+  >
+  > **To install:** open Cowork → Settings → "Connect Chrome" (or equivalent in your version) → follow the install prompts → return here and say "ready" or "try again."
+  >
+  > Direct link: https://chromewebstore.google.com/ (search for "Claude" or "Cowork")
+
+  Wait for the user to confirm before continuing. Do not retry silently.
+
+### 0e. Workspace folder access
+
+```bash
+ls ~/Documents/Claude/ 2>&1 | head -3
+```
+
+If the folder is not accessible, this Cowork session doesn't have a workspace folder selected. Tell the user:
+
+> ⚠️ I need access to a folder where I can save your app's settings and signing keys. Please pick one in Cowork (Settings → Workspace folder, or use the "Select folder" prompt) and re-run.
+
+If it IS accessible, ensure the memory dirs exist:
+
+```bash
+mkdir -p ~/Documents/Claude/lovable-to-app-store/memory/{agencies,orgs,apps}
+mkdir -p ~/Documents/Claude/lovable-to-app-store/{keys,keystores}
+```
+
+### 0f. Apple Developer Program reachability
+
+```bash
+curl -sI https://api.appstoreconnect.apple.com/v1/apps -o /dev/null -w '%{http_code}\n'
+# Expect 401 (no auth provided) — confirms the API is reachable
+```
+
+If this returns anything other than 401 or 200, App Store Connect API is unreachable from the sandbox. Note it to the user; they may have to run this from a different network.
+
+---
+
 ## Step 1: Load Agency Memory
 
 ```bash

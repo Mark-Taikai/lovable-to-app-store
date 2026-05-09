@@ -4,6 +4,48 @@ All notable changes to the `lovable-to-app-store` plugin are documented here. Fo
 
 ## [Unreleased]
 
+## [2.0.2] — 2026-04-30
+
+### Added
+- **Step 0 environment handshake in `00-preflight.md`** — auto-detects and either auto-installs or prompt-installs everything the `ship` skill needs before doing any account or memory work:
+  - Bash sandbox tool versions (Node ≥ 22, python3, git, zip)
+  - Required Python packages (auto-installs Pillow, pyjwt, requests, cryptography)
+  - GitHub CLI (auto-downloads to /tmp on first run, no sudo required)
+  - Cowork Chrome extension connectivity (probes via `tabs_context_mcp`; if not connected, surfaces a clear install prompt with direct link instead of failing silently mid-workflow)
+  - Workspace folder access (creates `~/Documents/Claude/lovable-to-app-store/memory/{agencies,orgs,apps}` and `keys/`, `keystores/` automatically)
+  - App Store Connect API reachability (sanity check that returns 401/200)
+
+  Net effect: a fresh user installing the plugin gets a clear, sequenced setup the first time they say *"ship this app"* — no silent failures, no half-completed runs.
+
+- **Plugin-level README rewritten for end users** — punchy intro, prerequisites checklist with cost breakdown, install paths for both Cowork drag-drop and Claude Code CLI, first-run handshake explanation, "what the plugin actually does under the hood" deep-dive, and privacy/data section.
+
+### Fixed
+- **`references/03-capacitor-setup.md` no longer contains misleading v1.x `server.url` instructions.** The whole file is now a one-page redirect to refs 11 (bundled OTA architecture) and 12 (v1→v2 migration), with a strong warning that any v1.x server-url instructions encountered online or in archived docs would produce an Apple-Guideline-4.2-rejection-prone build. The previous file content was technically reachable as a "fallback" path during troubleshooting, which would silently undo the v2.0 architecture. That can no longer happen.
+
+## [2.0.1] — 2026-04-30
+
+### Security
+- Removed real ASC IDs from template examples that were inadvertently included in v2.0.0.
+
+## [2.0.0] — 2026-04-30
+
+### Added (major architecture rewrite)
+- **Bundled `dist/` inside the IPA** instead of `server.url` pointing at the live Lovable URL. This is the primary change. Apps shipped on v1.x were at risk of Apple Guideline 4.2 ("Minimum Functionality") rejection — the v2.0 bundle pattern resolves this.
+- **OTA via `@capgo/capacitor-updater` + Supabase Storage** with sha256 verification and 10-second auto-rollback if the new bundle fails to call `notifyAppReady()`.
+- **Beta App Review submission via App Store Connect API** (`asc-submit.py`) — no manual click-through after upload.
+- **Pre-archive verification checklist** in `references/10-build-gotchas-addendum.md` — catches silent-failure causes (missing `UIMainStoryboardFile`, wrong `iosScheme`, mismatched Capacitor versions, GoogleSignIn pod < 7.1.0, missing post_install hook, etc.) before `xcodebuild archive` runs.
+- New references: `11-bundled-ota.md` (architecture), `12-migration-guide.md` (v1.x→v2.0 path).
+- New templates: `vite.config.prod.ts`, `index-html-boot-overlay.html`, `ota-updater-client.ts`, `ota-manifest-edge-function.ts`, `asc-submit.py`, `build-local.sh`.
+
+### Breaking
+- New apps shipped with v2.0+ produce a different `capacitor.config.ts` (no `server.url`) and different boot flow. Existing v1.x apps continue to run but should migrate per `12-migration-guide.md`.
+
+## [1.1.2] — 2026-04-28
+
+(Internal cleanup release — see commit history.)
+
+
+
 ## [2.0.1] — 2026-04-29
 
 ### Security

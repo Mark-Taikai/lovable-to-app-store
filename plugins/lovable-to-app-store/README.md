@@ -1,121 +1,125 @@
 # Lovable to App Store
 
-Turn any Lovable app into a fully published iOS + Android app — no app store knowledge required.
+Ship any Lovable app to TestFlight + Google Play — by talking to Claude.
 
-## What This Plugin Does
+---
 
-This plugin automates the entire journey from a Lovable web app to a native app in TestFlight and Google Play. It handles service registration, Capacitor configuration, code injection, builds, and submissions.
+## What you do
 
-OTA updates are automatic — the app loads directly from your live Lovable URL, so every Lovable deploy reaches users on their next app launch. A service worker caches the app locally so it also works offline.
+Once installed, you say one of these to Claude in Cowork (or Claude Code):
 
-## Skills
+| Phrase | What happens |
+|---|---|
+| `ship this app to TestFlight: <github-url>` | First-time submission. ~30 min from clean repo to TestFlight invite. |
+| `push update for <app name>` | OTA update after a Lovable change. No App Store re-submission needed. |
+| `add Face ID to <app name>` | Adds a native feature, rebuilds, submits a new TestFlight build. |
 
-### `ship` — Publish a new app
-Triggered by: *"ship this app: [github URL]"*, *"get this on TestFlight"*, *"turn this Lovable app into a native app"*
+Claude reads the skill, asks ~6 plain-English questions, drives your browser through Apple Developer + Google Play + RevenueCat + OneSignal, sets up Capacitor with **bundled `dist/`** (Apple Guideline 4.2 compliant by default), runs the build via GitHub Actions CI, and submits to **Beta App Review** automatically via the App Store Connect API.
 
-Full end-to-end workflow:
-1. Reads the repo and understands the app
-2. Asks ~6 plain-English questions (app name, client, bundle ID, accounts, native sign-in providers)
-3. Registers the app with Apple Developer, App Store Connect, Google Play Console, RevenueCat, OneSignal, and Capgo — using the browser
-4. Wraps the app in Capacitor and injects SDK initialization code
-5. Builds and submits to TestFlight + Play internal testing
-6. Saves all settings to memory for future runs
+---
 
-### `update` — Push an OTA update
-Triggered by: *"update [app name]"*, *"push OTA"*, *"deploy latest Lovable changes"*
+## What you need before the first ship
 
-Pulls the latest Lovable changes and pushes them to installed apps via Capgo — no App Store submission needed for JS / CSS / asset changes. Detects if any Supabase Edge Functions changed and reminds you to ask Lovable to redeploy them (Lovable does NOT auto-deploy edge functions on push).
+**Accounts** (Claude can't create these for you):
 
-### `add-native` — Add a native capability
-Triggered by: *"add haptics to [app]"*, *"add camera"*, *"add Face ID"*, *"add [feature]"*
+- ✅ **Apple Developer Program** — $99/year — [enroll here](https://developer.apple.com/programs/) (allow 24–48h for approval)
+- ✅ **Google Play Console** — $25 one-time — [sign up](https://play.google.com/console/signup) (usually instant)
+- ✅ A Lovable app with a public GitHub repo
 
-For adding native iOS/Android features as Capacitor adds support:
-- Installs the right Capacitor plugin
-- Adds permission strings to Info.plist and AndroidManifest.xml
-- Handles Apple Developer Portal capability setup
-- Injects typed wrapper code for use in Lovable
-- Rebuilds and submits a new version (required for native changes)
+**Free accounts you'll create during ship** (Claude walks you through them):
 
-## Memory System
+- RevenueCat (in-app purchases) — free up to $2.5k MTR
+- OneSignal (push notifications) — free up to 10k subscribers
+- Supabase (only if your app uses Google/Apple Sign-In) — free tier
 
-The plugin remembers everything it registers — Apple Team IDs, RevenueCat keys, OneSignal App IDs, Capgo tokens, and more. On subsequent runs, it loads this data automatically.
+**On your computer:**
 
-Memory is stored at: `~/Documents/Claude/lovable-to-app-store/memory/`
+- A working **Cowork desktop app** (this is the recommended path), OR Claude Code in a terminal
+- The **Cowork Chrome extension** installed and authorized — this is what lets Claude drive Apple/Google's web consoles for you. If it's not installed, the `ship` skill will detect that and tell you what to do.
+- macOS is NOT required — builds run on GitHub Actions. Linux / Windows users can ship to the App Store from Cowork.
 
-**What is stored:** App IDs, API keys, bundle IDs, team IDs, account emails, OAuth client IDs.
-**What is never stored:** Account passwords, keystore passwords, the App Store Connect `.p8` file content (only the path), or any value that grants standalone access to a service.
+---
 
-> ⚠️ **Keystore safety:** Once you publish an Android app to Google Play, you can ONLY release updates to it by signing them with the same `.keystore` file. **Losing the keystore = permanently losing the ability to update that app.** Back up your keystore file to a password manager or encrypted off-device storage immediately after creating it. The plugin stores keystores at `~/Documents/Claude/lovable-to-app-store/keystores/` so they survive between sessions, but you should still keep an off-device backup.
+## Install
 
-## Native Sign-In (Google / Apple)
+### Cowork (one-click drag-drop)
 
-If the app needs native Google or Apple Sign-In, the plugin handles the full flow — including the Supabase Edge Function that's required when Supabase is managed by Lovable. The native idToken's `aud` claim doesn't match what the Lovable-locked Supabase Google/Apple provider validates against, so a server-side code exchange is mandatory.
+1. Download the latest `.plugin` file:
+   **[lovable-to-app-store.plugin](https://github.com/Mark-Taikai/lovable-to-app-store/releases/latest/download/lovable-to-app-store.plugin)**
+2. Open Cowork → Settings → click the **`+`** next to "Personal plugins"
+3. Drop the file in
+4. Done. Skills become available in any Cowork conversation.
 
-What gets created automatically when you answer "yes" to the upfront sign-in question:
-- Three OAuth client IDs in Google Cloud Console (Web, iOS, Android) and/or an Apple Services ID + JWT key
-- A `google-native-signin` and/or `apple-native-signin` edge function in the repo
-- The right `iosClientId` / `serverClientId` block in `capacitor.config.ts`
-- The reversed iOS client ID URL scheme in `Info.plist`
-- An `App.entitlements` file with `com.apple.developer.applesignin`
-- The native client wrapper at `src/lib/native/google-sign-in.ts` (and the Apple equivalent)
-- A reminder to ask Lovable to deploy the edge functions (Lovable does NOT auto-deploy)
+### Claude Code (CLI)
 
-See `skills/ship/references/07-google-native-signin.md` and `08-apple-native-signin.md` for the architecture details.
+```
+/plugin marketplace add Mark-Taikai/lovable-to-app-store
+/plugin install lovable-to-app-store@lovable-to-app-store
+```
 
-## Services Used
+To update later: `/plugin update lovable-to-app-store@lovable-to-app-store` (Claude Code) or re-download and re-drop the new `.plugin` (Cowork).
 
-| Service | Purpose | Cost |
-|---------|---------|------|
-| Apple Developer Program | App ID registration, TestFlight | $99/year |
-| App Store Connect | App listing and submission | Included with Apple Developer |
-| Google Play Console | Android listing and submission | $25 one-time |
-| RevenueCat | In-app purchases and subscriptions | Free up to $2.5k monthly tracked revenue |
-| OneSignal | Push notifications | Free up to 10,000 subscribers |
-| Capgo | OTA update delivery | Free tier available; paid plans for higher volume |
-| Supabase | Backend + Edge Functions (when used by the app) | Free tier available |
+---
 
-OTA updates also rely on your existing Lovable hosting (the live `server.url` the app loads from) — included with your Lovable plan.
+## First-run handshake (what Claude does for you)
 
-## Requirements
+When you say *"ship this app to TestFlight"* for the first time, Claude will:
 
-- macOS with Xcode installed (for iOS builds), OR a CI runner with macOS access (the plugin includes a battle-tested GitHub Actions workflow that uses `runs-on: macos-15`)
-- Node.js 18+
-- Apple Developer Program membership
-- Google Play Console account
-- Accounts (or willingness to create) at RevenueCat, OneSignal, and Capgo
-- A Supabase project ONLY if the app uses native Google or Apple Sign-In (the edge-function flow assumes Supabase auth)
+1. **Check prerequisites.** Detects whether the Cowork Chrome extension is connected, whether the bash sandbox has Node + Python, whether your Apple Developer account is reachable. If anything is missing, it tells you exactly what to install/enable before proceeding — it does NOT silently fail.
+2. **Auto-install non-account dependencies** (Pillow for icon resizing, the GitHub CLI for PAT-less pushes, etc.) into the sandbox where it has permission.
+3. **Prompt for human-only steps** (paying Apple's $99, accepting Google's terms) with direct links and clear "I'll wait for you to confirm" pauses.
+4. **Save everything** to `~/Documents/Claude/lovable-to-app-store/memory/` so subsequent ships under the same Apple account skip the registration steps entirely.
 
-## Installation
+If something does go wrong during the run, Claude has a battle-tested troubleshooting catalog (`references/10-build-gotchas-addendum.md`) covering ITMS-91061, provisioning-profile invalidation, the silent-black-screen Info.plist issue, and ~15 other failure modes from real shipped apps.
 
-This plugin is distributed as a Claude / Cowork plugin. To install:
+---
 
-1. Clone or download this repository.
-2. Open Claude Code or Cowork and add this repo as a plugin marketplace, or drag-and-drop the bundled `.plugin` zip into the plugin install UI.
-3. Verify the skills are available — try the trigger *"ship this app: [github URL of any Lovable repo]"* and the `ship` skill should activate.
+## What the plugin actually does (under the hood)
 
-The exact install command depends on your Claude/Cowork version. Refer to the official Claude Code plugin documentation for the current syntax.
+For curious users — none of this is required reading:
 
-## First Run
+- **Bundled `dist/` inside the IPA** instead of a remote `server.url`. This is what makes the app pass Apple Guideline 4.2 ("Minimum Functionality") review.
+- **OTA updates via `@capgo/capacitor-updater`** pulling signed bundles from your own Supabase Storage bucket. Sha256-verified, 10-second auto-rollback if the new bundle fails to call `notifyAppReady()`.
+- **Native Google + Apple Sign-In** via Supabase Edge Functions that exchange the native auth code for an idToken with the right `aud` claim. (Standard `signInWithOAuth()` doesn't work on Lovable-managed Supabase — the plugin handles the workaround.)
+- **GitHub Actions CI** with `runs-on: macos-15` and Xcode 26 (required by Apple after April 28, 2026). Auto-creates a fresh distribution cert and provisioning profile per build via the App Store Connect API — no manual cert management.
+- **Beta App Review submission** via ASC API after every successful upload, so you don't have to click through App Store Connect after each build.
 
-On first use, Claude will:
-1. Create the memory directory at `~/Documents/Claude/lovable-to-app-store/memory/`.
-2. Ask for your agency name (the entity that owns the Apple Developer account) and your first org name and default bundle ID prefix (e.g., `com.yourcompany`).
-3. Save these as agency- and org-wide defaults.
+Architecture deep-dives:
+- `skills/ship/references/11-bundled-ota.md` — full v2.0 architecture
+- `skills/ship/references/12-migration-guide.md` — for apps shipped on v1.x
+- `skills/ship/references/10-build-gotchas-addendum.md` — silent-failure checklist
 
-Every subsequent app uses these defaults unless overridden per client.
+---
 
-## Secret Hygiene (Read Before First Push)
+## Costs (after install, recurring)
 
-This plugin works with several files that must NEVER be committed to a public repo. Before your first `git push`, append the contents of `skills/ship/references/templates/.gitignore.additions` to your repo's `.gitignore`. It covers `.p8`, `.keystore`, `.env`, build outputs, and other sensitive artifacts.
+| Service | Cost | Notes |
+|---|---|---|
+| Apple Developer Program | $99/year | Required for any iOS publishing |
+| Google Play Console | $25 one-time | Required for any Android publishing |
+| RevenueCat | Free up to $2.5k MTR | In-app purchases |
+| OneSignal | Free up to 10k subscribers | Push notifications |
+| Supabase | Free tier covers most apps | Only needed for native sign-in |
+| GitHub Actions | Free for public repos | Build CI |
 
-If you accidentally push a `.p8` or `.keystore` to a public repo, **rotate the credential immediately** in the issuing console — scrubbing git history is not enough. See `skills/ship/references/04-build-and-submit.md` for full incident-response guidance.
+Your floor is **$99/year + $25 once** to publish on both stores forever.
+
+---
+
+## Privacy / data
+
+The plugin stores everything locally at `~/Documents/Claude/lovable-to-app-store/memory/`:
+- App IDs, RevenueCat keys, OneSignal IDs, Apple Team ID, OAuth client IDs, etc.
+- **Never** stores: passwords, keystore passwords, the raw `.p8` private key contents (only paths).
+
+Nothing leaves your machine except the obvious: API calls you'd make anyway (App Store Connect, Google Play, etc.) using your own credentials.
+
+---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see `LICENSE`. Use it, fork it, ship apps with it.
 
-## Contributing
+## Issues
 
-Issues and PRs welcome. Before submitting changes:
-- Sanity-check that no real credentials, internal URLs, or personal information are in the diff.
-- Run a full ship workflow on a throwaway test app to verify your change doesn't break end-to-end behavior.
+https://github.com/Mark-Taikai/lovable-to-app-store/issues
