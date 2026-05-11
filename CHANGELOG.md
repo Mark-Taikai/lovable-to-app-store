@@ -4,6 +4,13 @@ All notable changes to the `lovable-to-app-store` plugin are documented here. Fo
 
 ## [Unreleased]
 
+## [2.0.4] — 2026-05-11
+
+### Fixed
+- **Cowork "plugin validation failed" install error (root cause).** The v2.0.3 fix (removing `.sh` files) wasn't enough — Cowork also rejects plugins whose `description` field exceeds ~400 characters. v2.0.0–v2.0.3 had a 662-char description; the longest description across all working installed plugins on a test system was 395 chars (`brand-voice`). Shortened the description to 272 chars, which installs cleanly.
+- This is purely a manifest fix — no skill / template / reference changes from v2.0.3.
+
+
 ## [2.0.3] — 2026-05-10
 
 ### Fixed
