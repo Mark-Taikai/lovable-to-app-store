@@ -133,7 +133,7 @@ The `references/templates/` directory contains the exact files from the successf
 - `references/templates/ota-updater-client.ts` → `src/lib/ota-updater.ts` (2 variables)
 - `references/templates/ota-manifest-edge-function.ts` → `supabase/functions/ota-manifest/index.ts`
 - `references/templates/asc-submit.py` → repo root (used by build script + CI; no substitutions)
-- `references/templates/build-local.sh` → repo root if user wants local builds (8 variables)
+- `references/templates/build-local.sh.template` → save as `build-local.sh` in repo root (rename + `chmod +x`); if user wants local builds (8 variables). Stored with `.template` extension because Cowork's plugin validator rejects bare `.sh` files.
 
 ---
 

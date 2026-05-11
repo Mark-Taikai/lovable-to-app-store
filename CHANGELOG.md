@@ -4,6 +4,13 @@ All notable changes to the `lovable-to-app-store` plugin are documented here. Fo
 
 ## [Unreleased]
 
+## [2.0.3] — 2026-05-10
+
+### Fixed
+- **Cowork "plugin validation failed" install error.** Removed `build.sh` (a dev-only helper that had leaked into the `.plugin` zip) and renamed `templates/build-local.sh` → `templates/build-local.sh.template`. Cowork's plugin validator rejects `.sh` files for security reasons — the renamed `.template` extension passes validation, and the doc reference in `ship/SKILL.md` was updated to tell users to rename + `chmod +x` after extracting.
+- No functional changes — same skills, same workflow. v2.0.3 ships the exact content of v2.0.2 minus the two `.sh` files that blocked install.
+
+
 ## [2.0.2] — 2026-04-30
 
 ### Added
