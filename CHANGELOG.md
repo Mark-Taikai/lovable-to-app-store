@@ -4,6 +4,19 @@ All notable changes to the `lovable-to-app-store` plugin are documented here. Fo
 
 ## [Unreleased]
 
+## [2.0.5] — 2026-05-11
+
+### Added — autonomy
+- **"Operating Philosophy" section in `ship/SKILL.md`** — explicit principle: *Claude does everything, the user only logs in*. Lists the 8 specific things Claude must do autonomously (read repo list from logged-in GitHub, generate PAT via browser, read Lovable URL from logged-in lovable.dev, read Apple Team ID from logged-in developer.apple.com, etc.) instead of asking the user.
+- **Step 0g in `00-preflight.md`** — Chrome login bootstrap. Opens GitHub, Lovable, Apple Developer, Google Play in order, verifies the user is logged in to each, prompts for login if not. All downstream data (Team ID, account emails, repo URLs) is read autonomously from these sessions — no more "what's your repo URL?" prompts.
+- **`01-questions.md` slimmed from 9 questions to 4.** Only asks what only the user knows: app display name, bundle ID, app icon, native sign-in providers. Everything else is read from logged-in browser sessions.
+- **TanStack Start architecture detection (Step 1)** — Lovable migrated newer projects from Vite SPA to TanStack Start on Cloudflare Workers. Plugin now auto-detects which architecture the repo uses (signals: `src/routes/`, `app.config.ts`, `@tanstack/start`, `wrangler.toml`, `@lovable.dev/cloud-auth-js`) and branches the workflow. Saves `architecture` field to memory for subsequent runs.
+- **New reference: `13-tanstack-start.md`** — canonical guide for shipping TanStack Start apps: detecting server-only code, the static SPA build preset (`vinxi build --preset static` or `vite build --config vite.config.native.ts`), capacitor.config.ts differences, `@lovable.dev/cloud-auth-js` wiring for native sign-in, common TanStack-specific failures.
+
+### Fixed — hard rule against regression
+- **Explicit prohibition on falling back to v1.x server.url + WebView OAuth.** Added a "HARD RULE" section to both `ship/SKILL.md` and `13-tanstack-start.md` that lists the specific reasons this regression is unacceptable: (1) Apple Guideline 4.2 rejection, (2) native Google/Apple Sign-In is broken inside a `server.url` WebView (OAuth redirects open Safari, session lands outside the WebView's cookie jar), (3) it throws away the edge-function flow developed specifically to fix the WebView OAuth issue. Future Claude sessions are instructed to STOP and surface the problem to the user rather than silently regress.
+
+
 ## [2.0.4] — 2026-05-11
 
 ### Fixed

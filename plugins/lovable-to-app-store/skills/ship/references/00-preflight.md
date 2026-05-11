@@ -100,6 +100,48 @@ If this returns anything other than 401 or 200, App Store Connect API is unreach
 
 ---
 
+### 0g. Chrome login bootstrap — open all needed services and verify the user is logged in
+
+> **Read `ship/SKILL.md` "Operating Philosophy" first.** The user only logs in. Claude does the rest. This step opens every service Claude will read from later, so all downstream steps can autonomously pull data without asking the user to type anything.
+
+For each of the following services, open a tab in Chrome and check login state. If not logged in, prompt the user to log in to that specific tab and wait for confirmation before proceeding.
+
+**Tabs to open in order:**
+
+| # | URL | What Claude reads later from this session | If not logged in, prompt |
+|---|---|---|---|
+| 1 | `https://github.com/?tab=repositories` | The user's repo list (to pick which app to ship), and later, autonomously creates a PAT under Settings → Tokens for `git push` | *"I've opened GitHub. Please sign in in the tab — then tell me 'logged in' or 'ready'."* |
+| 2 | `https://lovable.dev/projects` | The user's Lovable project list, the live preview URL for the chosen project | *"I've opened Lovable. Please sign in — then tell me 'ready'."* |
+| 3 | `https://developer.apple.com/account` | Apple Developer email, Apple Team ID, membership status (to know whether $99/year is paid) | *"I've opened Apple Developer. Please sign in. If you haven't paid the $99/year yet, that's fine — sign up at developer.apple.com/programs first, then come back here when enrolled. Say 'ready' when signed in."* |
+| 4 | `https://play.google.com/console` | Google Play account email, whether the $25 one-time fee is paid | *"I've opened Google Play Console. Please sign in. If you haven't paid the $25 one-time fee, sign up at play.google.com/console/signup first. Say 'ready' when signed in."* |
+
+**Implementation pattern (use `tabs_create_mcp` + `navigate` + `get_page_text`):**
+
+```pseudocode
+for each service in [GitHub, Lovable, Apple, Google Play]:
+    tabId = tabs_create_mcp(...)
+    navigate(tabId, service.url)
+    wait 2 seconds
+    pageText = get_page_text(tabId)
+    if "Sign in" or "Login" or "Sign up" appears prominently:
+        announce("I've opened {service.name} — please sign in in that tab, then tell me 'ready'.")
+        wait_for_user_confirmation()
+    else:
+        announce("✓ Already signed in to {service.name}.")
+        save user identity to working memory for this session
+```
+
+**Important:**
+
+- Do NOT open all four tabs at once — that overwhelms the user. Open one, get the user logged in, save the page identity (email/account name) to memory, move to the next.
+- For **RevenueCat** and **OneSignal**, defer login until Step 3 (service registration). Most users don't have these accounts yet; the registration flow creates them.
+- For **Lovable**, only open it if the user picked a repo that looks like a Lovable app in Step 1. Otherwise skip — they may be shipping a non-Lovable app and we don't want to confuse them.
+- Keep these tabs open through the entire workflow. Claude refers back to them multiple times (e.g. Step 5 generating an Apple ASC key reads from the same logged-in Apple Developer tab).
+
+**If the user already had these tabs open in their group from a previous run:** just `read_page` to confirm login state and reuse them. Don't open duplicates.
+
+---
+
 ## Step 1: Load Agency Memory
 
 ```bash

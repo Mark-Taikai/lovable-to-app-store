@@ -1,47 +1,46 @@
 # Upfront Questions
 
-Ask all questions at once using AskUserQuestion before doing any browser work. Pre-fill answers that can be inferred from the repo or loaded from memory. If a client already exists in memory with all required data, skip the questions entirely and confirm with one message: "I found [Client Name] in memory — using their Apple Team ID and existing settings. Starting now."
+> **Read `ship/SKILL.md` "Operating Philosophy" first.** Most questions previously asked here are now answered autonomously by Claude reading from logged-in browser sessions. Only ask things only the user knows.
 
-## The Nine Questions
+This skill asks the user **at most 4 things** up front, then proceeds autonomously. Anything else needed (Apple Team ID, Lovable URL, Google account email, RevenueCat keys, etc.) is read by Claude from logged-in browser sessions you opened in pre-flight.
 
-### 1. App display name
-- Pre-fill guess from repo `name` in package.json, title tag in index.html, or repo name
-- Question: "What should the app be called in the App Store?"
-- Example: "Acme Tracker"
+Ask all 4 in a single `AskUserQuestion` call. Never ask mid-workflow.
 
-### 2. Client name (for memory organization)
-- Use to create the memory folder and namespace bundle IDs
-- Question: "Which client or project is this for? (Used to organize your app settings)"
-- Example: "Acme Corp" or "Acme Internal"
-- If memory already has this client, auto-fill and skip
+---
 
-### 3. Bundle ID
-- Suggest: `com.{clientname-lowercase-nospaces}.{appname-lowercase-nospaces}`
-- Example: `com.acmecorp.tracker`
-- Question: "What should the app's bundle ID be? (This is a permanent, unique identifier)"
-- Show suggestion and let them accept or change
+## The 4 Questions
 
-### 4. Apple Developer account
-- If client exists in memory with Apple Team ID → skip this question, confirm in summary
-- If new client: "What email address is the Apple Developer account under?"
-- Note: Claude will navigate to developer.apple.com and ask the user to sign in
+### Q1. App display name
 
-### 5. Google Play account
-- If client exists in memory with Play Console account → skip this question
-- If new: "What Google account manages this client's Google Play Console?"
-- Note: Claude will navigate to play.google.com/console and ask the user to sign in
+The name that shows under the app icon on the iPhone home screen. Apple displays this directly to end users.
 
-### 6. Lovable deployment URL
-- This is the URL where Lovable hosts the live web version of the app
-- Usually format: `https://{app-id}.lovable.app` or custom domain
-- Question: "What's the Lovable URL for this app? (Used to pull the latest build for OTA updates)"
-- If they don't know: instruct them to check the Lovable project settings and paste the URL
+- **Pre-fill suggestion** from one of (in priority order):
+  - `manifest.name` in vite.config.ts's VitePWA block (if present)
+  - `<title>` tag in `index.html`
+  - `name` in `package.json`, converted from kebab-case to title case
+  - The GitHub repo name, converted to title case
+- **Example:** for repo `recipe-finder` → suggest `"Recipe Finder"`
+- **Phrasing:** *"What should the app be called on the home screen? Suggesting `{guess}` — accept, or type a different name."*
+- **Skip if** the memory file for this bundle ID already has `app_name`.
 
-### 7. App icon — 1024×1024 PNG (REQUIRED — prevents Apple rejection)
-- **This is mandatory.** Apple rejects any build that lacks a valid 1024×1024 "ios-marketing" icon.
-- Question: "Please upload your app icon — a 1024×1024 PNG with no transparency, no rounded corners. This is required by Apple."
-- If they upload one: save it as `assets/icon-1024.png` in the repo root and commit it.
-- If they can't provide one right now: generate a solid-color placeholder automatically:
+### Q2. Bundle ID
+
+The permanent unique identifier Apple and Google use to identify the app. Cannot be changed after first publish to either store.
+
+- **Pre-fill suggestion:**
+  - If memory has an org with `default_bundle_prefix` (e.g. `com.acmecorp`), suggest `{prefix}.{appname-lowercase-nospaces}`
+  - Otherwise: ask "what should the bundle ID prefix be?" with a Google-domain-style example
+- **Example:** for "Recipe Finder" under org "Acme" → suggest `com.acmecorp.recipefinder`
+- **Phrasing:** *"Bundle ID? Suggesting `{guess}`. This is permanent — change now or accept."*
+- **Skip if** memory already has an app file for this bundle ID (you're shipping a returning app).
+
+### Q3. App icon — 1024×1024 PNG
+
+Required by Apple. App is rejected without it. No way to skip.
+
+- **Phrasing:** *"Upload a 1024×1024 PNG with no transparency and no rounded corners. (Drag-drop here, or say 'generate one' and I'll create a placeholder you can replace before the App Store submission.)"*
+- **If user uploads:** save as `assets/icon-1024.png` in repo root, commit.
+- **If user says "generate one":** create a solid-color placeholder with the app name centered:
   ```python
   from PIL import Image, ImageDraw, ImageFont
   import os
@@ -57,52 +56,73 @@ Ask all questions at once using AskUserQuestion before doing any browser work. P
   draw.text(((1024-w)/2, (1024-h)/2), app_name, fill='white', font=font)
   os.makedirs('assets', exist_ok=True)
   img.save('assets/icon-1024.png')
-  print('Placeholder icon generated at assets/icon-1024.png')
   ```
-- Tell the user: "I've generated a placeholder icon. Replace `assets/icon-1024.png` with your real icon before submitting to the App Store."
-- All iOS icon sizes (including the critical 1024×1024 ios-marketing entry) are generated from this file during the Capacitor setup step — see `03-capacitor-setup.md`.
+- Then tell the user *"placeholder icon generated — replace `assets/icon-1024.png` with your real icon before the App Store review."*
+- The splash screen is auto-generated from the icon (no separate ask).
 
-### 8. Splash screen image (REQUIRED — prevents black screen on launch)
-- **This is required** to prevent a black screen while the WebView loads the Lovable URL.
-- Question: "Do you have a splash screen image? (PNG, ideally 2732×2732 to cover all screen sizes — or just say 'generate one' and I'll make a branded placeholder)"
-- If they upload one: save it to `assets/splash-2732.png` in the repo root.
-- If they say "generate one" or can't provide: generate from the icon:
-  ```python
-  from PIL import Image
-  import os
-  icon = Image.open('assets/icon-1024.png').convert('RGB')
-  splash = Image.new('RGB', (2732, 2732), color=(255, 255, 255))  # white bg
-  icon_resized = icon.resize((512, 512), Image.LANCZOS)
-  x = (2732 - 512) // 2
-  y = (2732 - 512) // 2
-  splash.paste(icon_resized, (x, y))
-  os.makedirs('assets', exist_ok=True)
-  splash.save('assets/splash-2732.png')
-  print('Placeholder splash generated at assets/splash-2732.png')
-  ```
-- Tell the user: "I've generated a white splash with your icon centered. Replace `assets/splash-2732.png` with your real design before App Store submission."
-- The splash imageset is wired into the iOS project during the Capacitor setup step.
+### Q4. Native sign-in providers
 
-### 9. Native sign-in providers (CRITICAL — affects service registration)
-- **Why this is upfront:** Each provider needs OAuth clients created in a third-party console (Google Cloud, Apple Developer Services ID) AND a Supabase Edge Function deployed by Lovable. Adding either one mid-workflow forces a restart of the service-registration step.
-- Question: "Does the app sign users in with Google, Apple, both, or neither?"
-- Options to present: `Google only`, `Apple only`, `Both Google and Apple`, `Neither (email/password or magic link only)`
-- **If the answer includes Google:**
-  - You must create THREE OAuth clients in Google Cloud Console (Web, iOS, Android) — see `02-service-registration.md` Section 6 and `07-google-native-signin.md` Step 1
-  - You must deploy the `google-native-signin` edge function — see `07-google-native-signin.md` Step 3
-  - The Web client ID + secret go into Supabase's Google provider config; the iOS reversed client ID becomes a `CFBundleURLTypes` entry in Info.plist
-- **If the answer includes Apple:**
-  - You must enable "Sign in with Apple" capability on the App ID in Apple Developer Portal — see `08-apple-native-signin.md` Step 1
-  - You must create an `App.entitlements` file (template at `references/templates/App.entitlements`)
-  - You must regenerate the provisioning profile after enabling the capability (otherwise it shows "Invalid")
-  - You must generate a JWT client secret for Supabase's Apple provider — see `08-apple-native-signin.md` Step 2
-  - You must deploy the `apple-native-signin` edge function
-- **If memory already has `google_auth` or `apple_auth` populated for this app:** confirm in the summary and skip the OAuth client creation — those don't change between builds. Only re-verify edge function deployment status.
+Affects which third-party services we register. Only the user knows this.
 
-## What to Do With Missing Answers
+- **Phrasing:** *"Does your app sign users in with Google, Apple, both, or neither (email/password or magic link only)?"*
+- **Options to present** (multi-choice, single answer):
+  - `Google only`
+  - `Apple only`
+  - `Both Google and Apple`
+  - `Neither (email/password or magic link)`
+- **Skip if** memory already has `google_auth` or `apple_auth` for this app. Confirm in the summary and re-verify edge function deployment status only.
 
-- If user skips a question, use the suggested value and note it in the summary
-- If bundle ID is already taken (discovered during Apple registration), suggest `{bundleid}.v2` and continue
-- If they don't have a Google Play Console account: note it in the summary, skip Android for now, offer to complete it later with the `ship` skill using `--platform ios` flag approach (just tell them to say "skip Android for now" next time)
-- If icon is not provided and placeholder generation fails (Pillow not installed): run `pip install pillow --break-system-packages` then retry
-- If sign-in providers question is skipped, default to `Neither` and tell the user: "I assumed no native Google/Apple sign-in. If you want either, run `add-native` after the first ship is complete — but it's faster to do it upfront via this skill."
+---
+
+## Things Claude reads from logged-in browser sessions (don't ask)
+
+These were questions in older versions. They are no longer asked because Claude can read them from the user's logged-in browser sessions opened during pre-flight Step 0:
+
+| What | Where Claude reads it from |
+|---|---|
+| Apple Developer email | `developer.apple.com/account` — top-right user menu after login |
+| Apple Team ID | `developer.apple.com/account` — Membership page, top-right of header |
+| Google Play account email | `play.google.com/console` — account menu after login |
+| Lovable deployment URL | `lovable.dev/projects/{id}` → Settings or live preview tab |
+| RevenueCat project membership | `app.revenuecat.com` — Projects dropdown after login |
+| OneSignal account | `app.onesignal.com` — top-right user menu after login |
+| GitHub repo URL | already known from Step 1 (where Claude listed and picked the repo) |
+| Org/client name for memory | inferred from the GitHub org/user that owns the repo + the app name; only ask if Claude can't infer cleanly |
+
+If any of these fail to read autonomously (e.g. user not logged in to a needed service), Claude prompts the user to log in to that specific service tab — it does NOT fall back to asking them to type the value.
+
+---
+
+## Downstream branching from Q4 (native sign-in)
+
+- **If Q4 answer includes Google:**
+  - Three OAuth clients needed in Google Cloud Console (Web + iOS + Android) — see `02-service-registration.md` Section 6 and `07-google-native-signin.md` Step 1.
+  - `google-native-signin` edge function must be created and deployed by Lovable.
+  - Web Client ID + Secret go to Supabase's Google provider config.
+  - iOS reversed Client ID becomes a `CFBundleURLTypes` entry in Info.plist.
+- **If Q4 answer includes Apple:**
+  - "Sign in with Apple" capability enabled on the App ID (Apple Developer Portal).
+  - `App.entitlements` created (template at `references/templates/App.entitlements`).
+  - Provisioning profile regenerated (otherwise shows "Invalid").
+  - JWT client secret generated for Supabase Apple provider — see `08-apple-native-signin.md` Step 2.
+  - `apple-native-signin` edge function deployed.
+- **If memory has the auth block already:** confirm and skip OAuth client creation — those don't change between builds. Re-verify the edge function deployment with the `curl` check.
+
+---
+
+## What to Do With Missing or Skipped Answers
+
+- **Q1 skipped:** use the suggested value. Note it in the summary so the user can object.
+- **Q2 skipped:** use the suggested value. If the bundle ID is taken during Apple registration, append `.v2` and continue.
+- **Q3 skipped or generation fails:** if Pillow isn't installed, install it (`pip install pillow --break-system-packages` — already auto-installed in pre-flight Step 0b). Generate the placeholder. Tell the user to replace it before App Store review.
+- **Q4 skipped:** default to `Neither`. Tell the user: *"I assumed no native sign-in. If you want Google/Apple later, run `add-native` — but adding it during this ship is ~10 minutes faster than retrofitting."*
+
+---
+
+## Returning Client (the zero-question path)
+
+If memory has an app file for this bundle ID with `app_name`, `bundle_id`, `apple_auth`/`google_auth` blocks populated, **ask nothing**. Confirm with a single message:
+
+> *"Found `{App Name}` in memory under `{org}`. Re-using your existing Apple Team ID, RevenueCat keys, OneSignal app, and {Google|Apple|both|no} sign-in config. Starting now."*
+
+Then proceed. This is the goal — the second time the user ships an app, the workflow asks zero questions.
