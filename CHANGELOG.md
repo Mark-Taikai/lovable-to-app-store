@@ -4,6 +4,12 @@ All notable changes to the `lovable-to-app-store` plugin are documented here. Fo
 
 ## [Unreleased]
 
+## [2.0.6] — 2026-05-11
+
+### Fixed
+- **HARD RULE section restored to `ship/SKILL.md`.** The v2.0.5 build sequence was wrong — I built the .plugin zip *before* adding the "HARD RULE against v1.x server.url + WebView OAuth regression" section, so it shipped without it. The Operating Philosophy and TanStack detection made it into v2.0.5 fine; the HARD RULE didn't. v2.0.6 contains the missing protection against the regression.
+
+
 ## [2.0.5] — 2026-05-11
 
 ### Added — autonomy

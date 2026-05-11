@@ -79,6 +79,33 @@ When in doubt, ask yourself: *"can I read this from a page the user is logged in
 > architecture before starting. Migrating an app from v1.x?
 > Read `references/12-migration-guide.md` first.
 
+---
+
+## 🚫 HARD RULE — Do NOT regress to v1.x server.url + WebView OAuth
+
+If the build is complicated (TanStack Start with heavy SSR, custom Cloudflare bindings, an app that resists static export, etc.), you might be tempted to "just" wrap a WebView around the live Lovable URL with `server.url` and call it shipped. **Do not do this.** It is the single specific regression v2.0 was built to prevent. The reasons:
+
+1. **Apple Guideline 4.2 ("Minimum Functionality") rejection.** A binary that's a thin WebView over a remote URL is exactly what App Review flags as "this should be a website, not an app." We have direct evidence of this happening to Lovable apps. Bundled `dist/` resolves it.
+
+2. **Native Google / Apple Sign-In stops working.** Inside a Capacitor WebView, the OAuth redirect from Google's auth flow opens in **the OS's external browser (Safari)**, not back into the app. The user ends up authenticated in Safari, with the app still showing the login screen. There is no clean fix at the WebView layer. The **only** working flow on Lovable-managed Supabase / Lovable Cloud is:
+   - Native iOS Google Sign-In SDK gets a `serverAuthCode`
+   - The code is exchanged server-side by an Edge Function (`google-native-signin`) using the WEB client secret
+   - The Edge Function returns an idToken with `aud = web_client_id`
+   - `signInWithIdToken()` (or the lovable-cloud-auth equivalent) accepts it
+
+   Same architecture for Apple. **Refs 07 + 08 are the canonical implementations** — they're the result of weeks of debugging the broken WebView OAuth path. Do not re-derive a "simpler" solution. The simpler solutions don't work.
+
+3. **`window.location.origin` redirect inside a WebView is NOT functionally equivalent to native sign-in.** It looks similar in code, but the runtime behavior diverges at the OAuth provider — Google opens Safari for the consent screen, the redirect URI registered for the Web client points back to your Lovable URL (not your app), and the user lands on the web version, not the native session. Even when it "appears" to work, the session lives in Safari's cookies and not in the WebView, so the user is logged out the moment they reopen the app.
+
+**When you hit a build that's hard to static-export:** STOP. Tell the user the architecture is non-trivial and present them with options:
+- Refactor the server-only code (you can do this for them — most SSR loaders become simple client fetches)
+- Defer native sign-in to a later version and ship without it (email/password / magic link only)
+- Acknowledge that this specific app may need a different deployment model and pause the ship
+
+Do NOT silently propose the WebView regression. If a previous Claude session in this project suggested it, that was wrong — flag it and switch back to the bundled approach.
+
+---
+
 ## ⚡ ALWAYS START HERE — Pre-flight (mandatory)
 
 Read `references/00-preflight.md` and run every check before doing anything else.

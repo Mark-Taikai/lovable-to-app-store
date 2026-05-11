@@ -1,6 +1,6 @@
 {
   "name": "lovable-to-app-store",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "description": "Ship Lovable apps to iOS TestFlight + Google Play by talking to Claude. Auto-detects Vite SPA vs TanStack Start architecture, bundled-dist build (Apple 4.2 compliant), Beta App Review submission, OTA via Supabase Storage, native Google/Apple Sign-In.",
   "author": {
     "name": "Lovable to App Store"
