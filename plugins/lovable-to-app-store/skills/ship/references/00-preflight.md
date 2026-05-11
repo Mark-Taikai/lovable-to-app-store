@@ -53,6 +53,62 @@ which gh 2>&1 || {
 
 `gh` is used to push to the user's GitHub account without manually-pasted PATs. If install fails, fall back to asking the user for a fine-grained PAT — but try the auto-install first.
 
+### 0c.1. GitHub email-privacy auto-config (prevents the "Pushes that expose your private email address" rejection)
+
+If the user has email privacy enabled on GitHub, their `user.email` from system git config is their real email — and pushes get **rejected** with:
+
+> *"GH007: Your push would publish a private email address."*
+
+Auto-detect and configure the noreply email **before** the first `git commit`:
+
+```bash
+# 1. Get the user's GitHub login from their logged-in session via gh CLI
+GH_LOGIN=$(/tmp/gh_2.62.0_linux_*/bin/gh api user --jq .login)
+GH_ID=$(/tmp/gh_2.62.0_linux_*/bin/gh api user --jq .id)
+
+# 2. Construct the noreply email format GitHub uses:
+#    {id}+{login}@users.noreply.github.com
+NOREPLY="${GH_ID}+${GH_LOGIN}@users.noreply.github.com"
+
+# 3. Set it as the user.email for the cloned repo (NOT global)
+cd /tmp/lovable-to-app-store/{repo-name}
+git config user.email "$NOREPLY"
+git config user.name "$GH_LOGIN"
+```
+
+This is local to the cloned repo — does NOT touch the user's system git config. The noreply email passes GitHub's privacy check and shows up in commits as the same identity as their normal pushes.
+
+### 0c.2. NPM version sanity check before pinning
+
+When adding a new Capacitor plugin to `package.json`, never write a version range you haven't verified. `npm install` with a non-existent version produces ETARGET errors that look like real bugs.
+
+For each plugin you're about to add:
+
+```bash
+PKG="@codetrix-studio/capacitor-google-auth"  # whatever you're adding
+
+# 1. What's the latest published?
+LATEST=$(npm view "$PKG" version 2>/dev/null)
+echo "  Latest: $LATEST"
+
+# 2. What does it peer-depend on?
+npm view "$PKG" peerDependencies --json 2>/dev/null
+
+# 3. If Capacitor peer is incompatible with our pin (7.6.x), find the highest
+#    compatible major:
+npm view "$PKG" versions --json 2>/dev/null | python3 -c "
+import json, sys
+versions = json.load(sys.stdin)
+# Filter to versions whose peer dep matches our Capacitor major
+print('Highest compatible version: <inspect manually>')
+print('All versions:', versions[-5:])
+"
+```
+
+Then pin the resolved version in `package.json` as `^X.Y.0` (just the minor — Apple-approved compat surface). The `references/templates/package-json-pins.md` doc has the known-good current set.
+
+**Hard rule:** never let `npm install` resolve a version range that includes the next major. If the plugin's latest major requires Cap 8 and we're on 7.6.x, pin to the highest 7-compatible version explicitly, not `^X` (which floats to next major on `npm update`).
+
 ### 0d. Cowork Chrome extension (prompt-install — required for service registration)
 
 Make a no-op Chrome MCP call to test connectivity:
@@ -100,7 +156,86 @@ If this returns anything other than 401 or 200, App Store Connect API is unreach
 
 ---
 
-### 0g. Chrome login bootstrap — open all needed services and verify the user is logged in
+### 0g. Scan `~/Downloads` for reusable Apple keys (saves creating fresh ones)
+
+Most users who've used Apple Developer Portal recently have unused `.p8` files sitting in their Downloads folder. They expire 6 months from creation and can be reused across multiple apps on the same Apple Team. The pre-flight should scan for them and offer reuse before creating new keys.
+
+```bash
+ls -la ~/Downloads/AuthKey_*.p8 2>/dev/null | awk '{print $NF, "("$5" bytes, "$6" "$7" "$8")"}'
+```
+
+For each `.p8` file found:
+1. Read the Key ID from the filename (`AuthKey_F2MKVXBTFL.p8` → `F2MKVXBTFL`)
+2. Use the ASC API or the user's logged-in Apple Developer Portal session to look up what kind of key it is:
+   - **ASC API key** (App Store Connect → Users and Access → Integrations → API): for CI uploads
+   - **Sign in with Apple key** (Developer → Keys → "Sign in with Apple" capability enabled): for native Apple Sign-In
+   - **APNs key**: for push notifications (older keys without our scope)
+3. **Auth keys are reusable across apps under the same Team**. Propose reuse to the user:
+
+   > *"I found `AuthKey_F2MKVXBTFL.p8` in your Downloads — it's the ASC API key from your Finally Music ship. Reuse it for this app instead of creating a new one? (You'd get rate-limited anyway — Apple caps each Team to ~3 active API keys.)"*
+
+4. If the user accepts, **copy** the key into `~/Documents/Claude/lovable-to-app-store/keys/` and save the path + Key ID to memory. Do NOT delete the original — leave it in Downloads for now.
+
+Same flow for Sign in with Apple keys (typically named like `AuthKey_G35C9M979Q.p8` — the same `.p8` extension; differentiated only by what's registered to it in the Developer Portal).
+
+If no `.p8` files are found, proceed to creating fresh keys later in Step 5.
+
+### 0h. Auto-mount the user's `~/Downloads` folder (one-time per session)
+
+If the bash sandbox can't see `~/Downloads/`, the scan above silently returns empty. Mount it via `request_cowork_directory` at the start of pre-flight, not lazily when we hit a cert download:
+
+```pseudocode
+# Pseudo-call (the actual tool name in Cowork is request_cowork_directory)
+result = request_cowork_directory(
+  path="~/Downloads",
+  reason="Scan for existing .p8 keys to reuse + receive new cert downloads from Apple Developer Portal"
+)
+if result.granted:
+  proceed with 0g scan
+else:
+  proceed without scan; later cert downloads will need a manual file-picker step
+```
+
+This saves a round-trip later in the workflow when Apple Developer Portal prompts the user to download a freshly-generated `.p8`.
+
+### 0i. Chrome extension conflict warning (password managers break automation)
+
+Password manager extensions (1Password, LastPass, Bitwarden, Dashlane) inject form-autofill overlays that intercept clicks on the Apple Developer Portal and other dashboards we drive. Symptom: Claude clicks a field, the password manager's popup appears, the form input gets eaten, the workflow hangs.
+
+Warn the user BEFORE starting Apple/Google flows:
+
+> *"⚠️ Before I start driving Apple Developer Portal and Google Play Console: please **disable** your password manager extension in Chrome for the next ~20 minutes (1Password, LastPass, Bitwarden, etc.). They intercept form clicks on these dashboards and break automation. I'll tell you when it's safe to re-enable. (You can keep them enabled for github.com / lovable.dev — those don't have the conflict.)"*
+
+Wait for the user's *"ok"* / *"disabled"* before proceeding to Apple/Google steps. If they say "I don't have one" — confirm and move on.
+
+### 0j. JS `DataTransfer` file-injection trick (fallback when `file_upload` MCP tool fails)
+
+Some pages have file inputs that Chrome's `file_upload` MCP tool can't reach — typically when the input is inside a Shadow DOM, hidden behind a custom drop zone overlay, or generated dynamically by client-side React. In that case, inject the file via JavaScript:
+
+```javascript
+// Pseudo-code; adapt per page. The file content has to already be in the
+// Chrome page context — usually we either fetch() it from a public URL or
+// the user pre-dragged it onto the page.
+const dt = new DataTransfer();
+const blob = await fetch('blob:url-of-file').then(r => r.blob());
+const file = new File([blob], 'csr.pem', { type: 'application/x-x509-ca-cert' });
+dt.items.add(file);
+
+const input = document.querySelector('input[type="file"][accept*=".pem"]');
+input.files = dt.files;
+input.dispatchEvent(new Event('change', { bubbles: true }));
+```
+
+Use this when:
+- `file_upload` MCP tool returns "element not found"
+- The file input is inside a Shadow DOM (common on modern dashboards)
+- The page uses a hidden file input + custom drop zone where `file_upload` clicks the visible drop zone instead of the input
+
+This is the workaround that unblocked the CSR upload at apple.com → Certificates. Document it in `02-service-registration.md` alongside the CSR step.
+
+---
+
+### 0k. Chrome login bootstrap — open all needed services and verify the user is logged in
 
 > **Read `ship/SKILL.md` "Operating Philosophy" first.** The user only logs in. Claude does the rest. This step opens every service Claude will read from later, so all downstream steps can autonomously pull data without asking the user to type anything.
 

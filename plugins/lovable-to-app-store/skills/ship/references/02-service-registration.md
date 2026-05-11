@@ -2,6 +2,34 @@
 
 Register services in this order. Open each in a new browser tab. Navigate to the login page, ask the user to sign in if needed, then take over.
 
+> ## ⚡ Reuse keys before creating new ones
+>
+> **Apple Developer Team keys are reusable across all apps under that Team.** Pre-flight Step 0g scanned `~/Downloads/` for existing `.p8` files; the user's app memory file may also reference keys from prior ships. Before any "Create new key" step below, check:
+>
+> 1. **Memory**: does the agency or org file already have `asc_key_id` / `asc_key_p8_path` / `apple_signin_key_id` populated? If yes, reuse — skip the create step.
+> 2. **Apple Developer Portal Keys API**: query `https://api.appstoreconnect.apple.com/v1/apiKeys` (using existing ASC creds) to list active keys under this Team. If a key with the right type already exists and is < 5 months old (Apple expires at 6 months), reuse it.
+> 3. **`~/Downloads/`** (from pre-flight 0g): if a matching `.p8` was found and proposed for reuse, use that.
+>
+> **Why this matters:** Apple caps each Team to 3 active ASC API keys. Creating a fresh one on every ship hits this cap fast and forces you to revoke older keys — which breaks CI for any previously-shipped app under the same Team. Reuse is the safe default.
+>
+> Only create a NEW key if no existing key of that type is found, OR the existing key is expired / about to expire, OR the user explicitly asks for a fresh key.
+
+> ## ⚡ JS DataTransfer fallback for CSR uploads
+>
+> The CSR upload step (under Apple Developer → Certificates → "+" → Upload CSR) has a file input that Chrome's `file_upload` MCP tool cannot reach reliably — it's wrapped in a custom drop-zone overlay. **If `file_upload` returns "element not found":** fall back to JS injection via `javascript_tool`:
+>
+> ```javascript
+> const dt = new DataTransfer();
+> const csrText = `-----BEGIN CERTIFICATE REQUEST-----\n...`;
+> const file = new File([csrText], 'csr.certSigningRequest', { type: 'application/x-x509-ca-cert' });
+> dt.items.add(file);
+> const input = document.querySelector('input[type="file"]');
+> input.files = dt.files;
+> input.dispatchEvent(new Event('change', { bubbles: true }));
+> ```
+>
+> See pre-flight Step 0j for full context on when to use this trick.
+
 ---
 
 ## 1. Apple Developer Portal

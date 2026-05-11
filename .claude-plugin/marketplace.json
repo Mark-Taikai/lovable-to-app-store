@@ -8,8 +8,8 @@
     {
       "name": "lovable-to-app-store",
       "source": "./plugins/lovable-to-app-store",
-      "description": "Ship Lovable apps to iOS TestFlight + Google Play by talking to Claude. Auto-detects Vite SPA vs TanStack Start architecture, bundled-dist build (Apple 4.2 compliant), Beta App Review submission, OTA via Supabase Storage, native Google/Apple Sign-In.",
-      "version": "2.0.6",
+      "description": "Ship Lovable apps to iOS TestFlight + Google Play by talking to Claude. Auto-detects Vite SPA / TanStack Start, picks the right native architecture, bundled-dist or server.url with Lovable Cloud Auth, Beta App Review submission.",
+      "version": "2.0.7",
       "category": "mobile",
       "tags": [
         "lovable",
@@ -20,6 +20,7 @@
         "app-store",
         "mobile",
         "supabase",
+        "tanstack",
         "google-signin",
         "apple-signin"
       ],

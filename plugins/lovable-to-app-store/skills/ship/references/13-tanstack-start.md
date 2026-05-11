@@ -6,6 +6,20 @@ This reference is consulted from `ship/SKILL.md` Step 1 when the architecture de
 
 ---
 
+## 🚫 The single most important rule on this page
+
+**Do NOT fall back to the v1.x `server.url` + WebView OAuth pattern**, no matter how complicated the TanStack Start build gets. See the "HARD RULE" section in `ship/SKILL.md`. Summary:
+
+- Apple Guideline 4.2 rejects WebView-wrapper apps.
+- Native Google/Apple Sign-In **does not work** inside a `server.url` WebView. OAuth redirects open Safari, the user authenticates there, and the app's WebView stays logged out. The edge-function flow in refs 07 + 08 is the only working path — it was developed because the WebView path was broken.
+- "`window.location.origin` redirects make it work inside the WebView" — **NO**. The session lands in Safari's cookie jar, not the WebView's. Looks fine on the first sign-in screen; user is logged out by the time they return to the app.
+
+If you can't get a TanStack Start app to static-export cleanly, STOP and surface the problem to the user. The acceptable resolutions are: refactor server-only code to client fetches, defer native sign-in, or pause the ship — NOT regress to WebView OAuth.
+
+---
+
+---
+
 ## How a TanStack Start Lovable app differs from a Vite SPA Lovable app
 
 | | Vite SPA (older) | TanStack Start (newer) |

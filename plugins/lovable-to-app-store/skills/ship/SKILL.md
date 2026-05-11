@@ -81,28 +81,47 @@ When in doubt, ask yourself: *"can I read this from a page the user is logged in
 
 ---
 
-## 🚫 HARD RULE — Do NOT regress to v1.x server.url + WebView OAuth
+## 🚦 Two-path rule — pick the right architecture for the app's stack
 
-If the build is complicated (TanStack Start with heavy SSR, custom Cloudflare bindings, an app that resists static export, etc.), you might be tempted to "just" wrap a WebView around the live Lovable URL with `server.url` and call it shipped. **Do not do this.** It is the single specific regression v2.0 was built to prevent. The reasons:
+There are **two valid native architectures** and one **forbidden** combination. The choice is determined by the app's stack, not by what's convenient:
 
-1. **Apple Guideline 4.2 ("Minimum Functionality") rejection.** A binary that's a thin WebView over a remote URL is exactly what App Review flags as "this should be a website, not an app." We have direct evidence of this happening to Lovable apps. Bundled `dist/` resolves it.
+### ✅ Path A — Bundled-dist + Capacitor Updater (v2.0 default)
 
-2. **Native Google / Apple Sign-In stops working.** Inside a Capacitor WebView, the OAuth redirect from Google's auth flow opens in **the OS's external browser (Safari)**, not back into the app. The user ends up authenticated in Safari, with the app still showing the login screen. There is no clean fix at the WebView layer. The **only** working flow on Lovable-managed Supabase / Lovable Cloud is:
-   - Native iOS Google Sign-In SDK gets a `serverAuthCode`
-   - The code is exchanged server-side by an Edge Function (`google-native-signin`) using the WEB client secret
-   - The Edge Function returns an idToken with `aud = web_client_id`
-   - `signInWithIdToken()` (or the lovable-cloud-auth equivalent) accepts it
+For apps with: **Vite SPA** + **raw Supabase OAuth** (i.e. `@supabase/supabase-js` directly).
 
-   Same architecture for Apple. **Refs 07 + 08 are the canonical implementations** — they're the result of weeks of debugging the broken WebView OAuth path. Do not re-derive a "simpler" solution. The simpler solutions don't work.
+- `webDir: 'dist'`, no `server.url` in `capacitor.config.ts`
+- Native Google/Apple Sign-In via the edge-function flow (refs 07 + 08)
+- OTA via `@capgo/capacitor-updater` from Supabase Storage
+- Standard v2.0 templates
 
-3. **`window.location.origin` redirect inside a WebView is NOT functionally equivalent to native sign-in.** It looks similar in code, but the runtime behavior diverges at the OAuth provider — Google opens Safari for the consent screen, the redirect URI registered for the Web client points back to your Lovable URL (not your app), and the user lands on the web version, not the native session. Even when it "appears" to work, the session lives in Safari's cookies and not in the WebView, so the user is logged out the moment they reopen the app.
+### ✅ Path B — server.url + Lovable Cloud Auth (for TanStack Lovable apps)
 
-**When you hit a build that's hard to static-export:** STOP. Tell the user the architecture is non-trivial and present them with options:
-- Refactor the server-only code (you can do this for them — most SSR loaders become simple client fetches)
-- Defer native sign-in to a later version and ship without it (email/password / magic link only)
-- Acknowledge that this specific app may need a different deployment model and pause the ship
+For apps with: **TanStack Start** (Cloudflare Workers backend) + **`@lovable.dev/cloud-auth-js`**.
 
-Do NOT silently propose the WebView regression. If a previous Claude session in this project suggested it, that was wrong — flag it and switch back to the bundled approach.
+- `server.url: 'https://app.lovable.app'` in `capacitor.config.ts` — the WebView loads the live Lovable URL
+- Native Google/Apple Sign-In via `lovable.auth.signInWithOAuth()` — **this works inside a WebView** because Lovable Cloud Auth manages the redirect via its own URL scheme handler, not Safari's. See ref **14-lovable-cloud-auth.md** for the wrapper.
+- OTA is automatic — every Lovable redeploy updates the live URL the WebView loads
+- Apple 4.2 risk mitigated by ensuring the app has substantial native features (haptics, push, IAP) demonstrating native value beyond the WebView
+
+### 🚫 FORBIDDEN — server.url + raw Supabase OAuth (the v1.x regression)
+
+For apps with: **any stack** + **`@supabase/supabase-js`** auth.
+
+This combination is what caused weeks of debugging. The failure mode:
+1. App opens Google sign-in inside the Capacitor WebView
+2. Google's consent page completes
+3. The OAuth redirect (to `https://app.lovable.app/auth/callback`) leaves the WebView and opens **Safari** instead — because Capacitor's WebView doesn't claim the URL scheme
+4. User authenticates in Safari; session lands in Safari's cookies
+5. WebView keeps showing the login page; user is logged out forever as far as the app knows
+
+**There is no clean fix at the WebView layer for raw Supabase OAuth.** The only working flows are Path A (native SDK + edge function code exchange) or Path B (Lovable Cloud Auth which handles the redirect itself).
+
+**When to STOP and ask the user:** if the app has `@supabase/supabase-js` directly AND won't static-export (e.g. SSR-heavy TanStack with no static preset), surface this as a blocker. The options are:
+- Refactor to Lovable Cloud Auth (`@lovable.dev/cloud-auth-js`) — then Path B works
+- Refactor server-only code to client fetches — then Path A works
+- Ship without native sign-in (email/password / magic link only) and use server.url — Apple 4.2 risk remains but native sign-in isn't broken
+
+Do NOT silently choose the forbidden combination. If a previous Claude session in this project suggested it, that was wrong — flag it and pick A or B.
 
 ---
 
@@ -210,8 +229,32 @@ consult `references/10-build-gotchas-addendum.md` for the other gotchas
 (ITMS-91061, provisioning-profile invalidation after enabling Sign in with
 Apple, and the rest).
 
-### Step 6: Save Memory
-Read `references/05-memory-schema.md`. Save after every step that produces a new ID or key. If Google or Apple Sign-In was wired up, also persist the `google_auth` / `apple_auth` blocks documented at the bottom of refs 07 and 08.
+### Step 6: TestFlight Group + Invite Testers
+After altool returns successfully (build uploaded), drive ASC TestFlight UI:
+
+1. Open `https://appstoreconnect.apple.com/apps/{app_store_connect_app_id}/testflight/groups` in Chrome
+2. If no Internal Testing group exists yet: click "+ Internal Testing Group" → name it "Internal Testers" (or read the org's default from memory)
+3. Add the user's Apple Developer account email as the first tester
+4. Read the resulting TestFlight join link (`testflight.apple.com/join/{code}`) from the group's page
+5. Save the join link + group ID to the app's memory file under `testflight: { group_id, join_link, testers: [...] }`
+6. If the user provided additional tester emails in upfront questions (or via memory's org-level `default_testers` list), invite them via the same UI
+
+For subsequent ships of the same app, this group already exists — just add new testers / read the existing join link.
+
+### Step 7: Save Memory (everything)
+Read `references/05-memory-schema.md`. Save after every step that produces a new ID or key. **Specifically save:**
+
+- All Apple IDs (Team ID, App ID, Services ID, ASC app ID)
+- All API keys + key paths (ASC, Sign in with Apple, APNs)
+- All Google OAuth client IDs (Web, iOS, Android) + iOS reversed scheme
+- All RevenueCat keys (iOS + Android)
+- OneSignal app ID + REST API key path
+- **NEW**: GitHub Actions run ID of the successful upload (for debugging later runs that fail)
+- **NEW**: Apple Beta App Review submission ID (for tracking review state)
+- **NEW**: TestFlight join link + group ID
+- **NEW**: `architecture` field (`vite-spa` / `tanstack-cloudflare` / `custom`) and `auth_client` (`supabase` / `lovable-cloud`)
+
+If Google or Apple Sign-In was wired up, also persist the `google_auth` / `apple_auth` (Path A) or `lovable_cloud_auth` (Path B) blocks per refs 07 / 08 / 14.
 
 ---
 

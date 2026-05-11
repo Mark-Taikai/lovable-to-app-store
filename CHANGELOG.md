@@ -4,6 +4,36 @@ All notable changes to the `lovable-to-app-store` plugin are documented here. Fo
 
 ## [Unreleased]
 
+## [2.0.7] — 2026-05-11
+
+### Added — toolchain pins & macos-26
+- **Capacitor 7.6.x pins (`templates/package-json-pins.md`).** Locked the Capacitor stack to the 7.x line because community plugins (`@capacitor-community/apple-sign-in`, `@codetrix-studio/capacitor-google-auth`) ship CocoaPods specs only — not Swift Package Manager — and break on Cap 8.x SPM-only assumptions. Verified via `npm view` before pinning.
+- **`runs-on: macos-26` in `ios-testflight.yml`.** Apple now requires iOS 26 SDK / Xcode 26 for all new App Store submissions; `macos-15` is rejected. Node bumped to 22 to match Xcode 26's expectations.
+- **`patch_podfile.py` + `patch_xcode_signing.py` (frozen scripts).** Idempotent CI patchers — Podfile gets PrivacyInfo, `ENABLE_USER_SCRIPT_SANDBOXING=NO`, `EXCLUDED_ARCHS x86_64`; pbxproj gets `CODE_SIGN_IDENTITY/STYLE`, `PROVISIONING_PROFILE`, `DEVELOPMENT_TEAM`. Replaces brittle inline sed/awk that previously broke on whitespace.
+- **`ITSAppUsesNonExemptEncryption=false` baked into the Info.plist patch step.** Removes the per-build TestFlight prompt asking about export compliance.
+
+### Added — TanStack Start + Lovable Cloud Auth path
+- **New reference: `14-lovable-cloud-auth.md`.** Documents the `@lovable.dev/cloud-auth-js` flow — used by newer TanStack Start projects. With Lovable Cloud Auth the WebView origin matches the OAuth callback origin (both `*.lovable.app`), so `server.url` + native OAuth works *without* the edge-function code-exchange dance. Includes `nativeGoogleSignIn` / `nativeAppleSignIn` wrappers.
+- **Two-path rule replaces the old HARD RULE** in `ship/SKILL.md`. Reconciliation: the prohibition on `server.url` + WebView OAuth applies *only* to raw `@supabase/supabase-js` auth (where the OAuth redirect leaks the session to Safari). With `@lovable.dev/cloud-auth-js` the redirect is same-origin and works inside the WebView. Plugin now picks **Path A** (bundled-dist + Supabase edge function) for Vite SPAs with raw Supabase OAuth, **Path B** (server.url + Lovable Cloud Auth) for TanStack Start with `@lovable.dev/cloud-auth-js`, and FORBIDS the third combination.
+
+### Added — pre-flight upgrades
+- **`~/Downloads` auto-scan for `AuthKey_*.p8` files** (Step 0g of `00-preflight.md`). On encountering an existing AuthKey file, plugin parses the Key ID from the filename, surfaces it to the user, and reuses it instead of creating a new one in App Store Connect (Apple caps ASC keys at 2 per team).
+- **`~/Downloads` auto-mount** (Step 0h). Plugin now calls `request_cowork_directory` for `~/Downloads` at the start of every run so it can read newly-downloaded `.p8` files, `.cer` files, and CSRs without manual user copying.
+- **Chrome extension conflict warning** (Step 0i). Password managers (1Password, LastPass, Bitwarden, browser-native autofill) intercept form fills and break automation. Plugin now surfaces a warning if it detects extension UI overlapping login forms; instructs user to temporarily disable conflicting extensions.
+- **JS DataTransfer file-injection fallback** (Step 0j + Step 2 of `02-service-registration.md`). When Apple Developer Portal's CSR upload form refuses programmatic clicks, plugin can construct a `DataTransfer` object via the Chrome JS execution tool and dispatch a `drop` event on the file input.
+- **GitHub email-privacy autodetect** (Step 0c.1). Plugin reads the user's GitHub login + ID, constructs the `{ID}+{LOGIN}@users.noreply.github.com` form, and configures `git config user.email` to it before the first commit — avoids the "GH007: pushed commits have private email" rejection.
+- **`npm view {pkg} version` sanity check** (Step 0c.2). Before pinning any dependency in `package.json`, plugin verifies the version actually exists on npm. Catches typos and unpublished versions before CI fails.
+
+### Added — TestFlight group + memory enrichment
+- **Internal Testing group creation as final step** (Step 6 of `ship/SKILL.md`). After build #1 finishes processing, plugin creates an Internal Testing group, invites the user's Apple ID, and surfaces the TestFlight install link.
+- **Existing-app detection** — plugin scans the Apple Team for bundle IDs and groups already registered before creating new ones. Reuses ASC keys, Apple Push keys, and signing certificates where possible.
+- **Memory schema additions** (`05-memory-schema.md`) — plugin now records `architecture` (`vite-spa` | `tanstack-start`), `auth_client` (`raw-supabase` | `lovable-cloud-auth`), `last_build_id`, `last_testflight_run_id`, `apple_team_id`, and per-app TestFlight group IDs to memory.
+
+### Notes
+- All v2.0.6 fixes (HARD RULE, Operating Philosophy) remain in place — v2.0.7 builds on top of them.
+- Both `lovable-to-app-store.plugin` and (in the CoBuild Edition private repo) `app-publisher-cobuild.plugin` v1.0.6 are released together.
+
+
 ## [2.0.6] — 2026-05-11
 
 ### Fixed
